@@ -5,6 +5,7 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
+
 from states.trip import TripStates
 from keyboards.main import (
     main_menu,

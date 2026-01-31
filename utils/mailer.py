@@ -2,7 +2,6 @@ import smtplib
 from email.message import EmailMessage
 from pathlib import Path
 
-/////12/////
 SMTP_HOST = "lr600.intermatic.energy"
 SMTP_PORT = 3587
 SMTP_USER = "vorobev@intermatic.energy"
