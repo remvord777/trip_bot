@@ -286,12 +286,35 @@ async def confirm_trip(message: Message, state: FSMContext):
         caption="📄 Служебное задание сформировано"
     )
 
+
+    subject = (
+        f"Служебное задание — {city_value} "
+        f"({data['date_from']} – {data['date_to']})"
+    )
+
+    body = (
+        "Добрый день.\n\n"
+        f"Прошу оформить командировку {city_value} {data['object']} "
+        f"с {data['date_from']} по {data['date_to']}.\n\n"
+        "Командировка от АО «Интерматик».\n\n"
+        "Служебное задание во вложении.\n\n"
+        "—\n"
+        "Бот командировок"
+    )
+
     send_email_with_attachment(
         to_email="vorobev@intermatic.energy",
-        subject="Служебное задание",
-        body="Сформировано автоматически ботом командировок.",
+        subject=subject,
+        body=body,
         file_path=docx_path,
     )
+
+    # send_email_with_attachment(
+    #     to_email="vorobev@intermatic.energy",
+    #     subject="Служебное задание",
+    #     body="Сформировано автоматически ботом командировок.",
+    #     file_path=docx_path,
+    # )
 
     await message.answer(
         "✅ КОМАНДИРОВКА СОХРАНЕНА\n\n"
