@@ -27,6 +27,15 @@ main_menu = ReplyKeyboardMarkup(
 def city_keyboard() -> ReplyKeyboardMarkup:
     cities = get_last_cities()
 
+    # 🔹 fallback, если БД пустая
+    if not cities:
+        cities = [
+            "Кириши",
+            "Адлер",
+            "Крымск",
+            "п. Рефтинский"
+        ]
+
     keyboard = []
 
     # формируем кнопки 2×2
