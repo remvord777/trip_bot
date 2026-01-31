@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from utils.mailer import send_email_with_attachment
+
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -14,11 +14,12 @@ from keyboards.main import (
     cancel_keyboard,
     purpose_keyboard,
     confirm_keyboard,
-    employee_keyboard
+    employee_keyboard,
 )
 from keyboards.calendar import build_calendar, current_calendar
 from db.database import get_connection
 from utils.docx_generator import generate_service_task
+from utils.mailer import send_email_with_attachment
 
 router = Router()
 
@@ -171,7 +172,6 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
         await call.message.edit_reply_markup(reply_markup=None)
 
         await call.message.answer(
-            f"🔴 Окончание: {selected}\n\n"
             "──────────────\n"
             "🎯 ЦЕЛЬ КОМАНДИРОВКИ\n"
             "──────────────\n\n"
@@ -206,19 +206,10 @@ async def ask_employee(message: Message, state: FSMContext):
 
 
 # ─────────────────────
-# СОТРУДНИК (ФИО)
+# СОТРУДНИК
 # ─────────────────────
 @router.message(TripStates.employee)
 async def set_employee(message: Message, state: FSMContext):
-    if message.text == "➕ Ввести вручную":
-        await message.answer(
-            "Введите ФИО полностью\n"
-            "например:\n"
-            "Иванов Иван Иванович",
-            reply_markup=cancel_keyboard
-        )
-        return
-
     await state.update_data(employee_name=message.text)
     data = await state.get_data()
 
@@ -239,97 +230,81 @@ async def set_employee(message: Message, state: FSMContext):
 
 
 # ─────────────────────
-# ПОДТВЕРЖДЕНИЕ → БД + DOCX + ИТОГ
+# ПОДТВЕРЖДЕНИЕ
 # ─────────────────────
 @router.message(TripStates.confirm)
 async def confirm_trip(message: Message, state: FSMContext):
-    if message.text == "✏️ Изменить":
-        await message.answer(
-            "🎯 Выберите цель командировки заново:",
-            reply_markup=purpose_keyboard()
-        )
-        await state.set_state(TripStates.purpose)
+    if message.text != "✅ Сохранить":
         return
 
-    if message.text == "❌ Отмена":
-        await state.clear()
-        await message.answer("❌ Командировка отменена", reply_markup=main_menu)
-        return
+    data = await state.get_data()
 
-    if message.text == "✅ Сохранить":
-        data = await state.get_data()
+    city_value = data["city"].strip()
+    if not city_value.lower().startswith("г."):
+        city_value = f"г. {city_value}"
 
-        # ─── приводим город к виду "г. Кириши"
-        city_value = data["city"].strip()
-        if not city_value.lower().startswith("г."):
-            city_value = f"г. {city_value}"
+    date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
+    date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
+    total = (date_to - date_from).days + 1
 
-        # ─── срок
-        date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
-        date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
-        total = (date_to - date_from).days + 1
+    doc_data = {
+        "city": city_value,
+        "object": data["object"],
+        "date_fr": data["date_from"],
+        "date_to": data["date_to"],
+        "total": total,
+        "purpose": data["purpose"],
+        "employee_name": data["employee_name"],
+        "position": "старший инженер",
+        "contract": "335",
+    }
 
-        # ─── данные для DOCX
-        doc_data = {
-            "city": city_value,
-            "object": data["object"],
-            "date_fr": data["date_from"],
-            "date_to": data["date_to"],
-            "total": total,
-            "purpose": data["purpose"],
-            "employee_name": data["employee_name"],
-            "position": "старший инженер",
-            "contract": "335",
-        }
-
-        # ─── БД
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO trips (city, place, date_from, date_to, purpose)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                city_value,
-                data["object"],
-                data["date_from"],
-                data["date_to"],
-                data["purpose"]
-            )
+    # БД
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO trips (city, place, date_from, date_to, purpose)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            city_value,
+            data["object"],
+            data["date_from"],
+            data["date_to"],
+            data["purpose"]
         )
-        conn.commit()
-        conn.close()
+    )
+    conn.commit()
+    conn.close()
 
-        # ─── DOCX
-        docx_path = generate_service_task(doc_data)
+    # DOCX — ОДИН РАЗ
+    docx_path = generate_service_task(doc_data)
 
-        await message.answer_document(
-            document=FSInputFile(docx_path),
-            caption="📄 Служебное задание сформировано"
-        )
-        docx_path = generate_service_task(data)
+    await message.answer_document(
+        document=FSInputFile(docx_path),
+        caption="📄 Служебное задание сформировано"
+    )
 
-        send_email_with_attachment(
-            to_email="vorobev@intermatic.energy",
-            subject="Служебное задание",
-            body="Сформировано автоматически ботом командировок.",
-            file_path=docx_path,
-        )
+    send_email_with_attachment(
+        to_email="vorobev@intermatic.energy",
+        subject="Служебное задание",
+        body="Сформировано автоматически ботом командировок.",
+        file_path=docx_path,
+    )
 
-        # ─── итоговый вывод
-        await message.answer(
-            "✅ КОМАНДИРОВКА СОХРАНЕНА\n\n"
-            f"👤 Сотрудник: {data['employee_name']}\n"
-            f"🏙 Город: {city_value}\n"
-            f"🏢 Объект: {data['object']}\n\n"
-            "📅 Даты:\n"
-            f"🟢 {data['date_from']}\n"
-            f"🔴 {data['date_to']}\n"
-            f"⏱ Срок: {total} суток\n\n"
-            "🎯 Цель:\n"
-            f"{data['purpose']}",
-            reply_markup=main_menu
-        )
+    await message.answer(
+        "✅ КОМАНДИРОВКА СОХРАНЕНА\n\n"
+        f"👤 Сотрудник: {data['employee_name']}\n"
+        f"🏙 Город: {city_value}\n"
+        f"🏢 Объект: {data['object']}\n\n"
+        "📅 Даты:\n"
+        f"🟢 {data['date_from']}\n"
+        f"🔴 {data['date_to']}\n"
+        f"⏱ Срок: {total} суток\n\n"
+        "🎯 Цель:\n"
+        f"{data['purpose']}",
+        reply_markup=main_menu
+    )
 
-        await state.clear()
+    await state.clear()
