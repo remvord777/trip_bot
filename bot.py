@@ -15,7 +15,6 @@ async def main():
     dp.include_router(trip.router)
 
     await dp.start_polling(bot)
-   ////*1*
 
 if __name__ == "__main__":
     asyncio.run(main())

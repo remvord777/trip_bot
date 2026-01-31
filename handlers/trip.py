@@ -1,5 +1,5 @@
 from datetime import date, datetime
-
+from utils.mailer import send_email_with_attachment
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -306,6 +306,14 @@ async def confirm_trip(message: Message, state: FSMContext):
         await message.answer_document(
             document=FSInputFile(docx_path),
             caption="📄 Служебное задание сформировано"
+        )
+        docx_path = generate_service_task(data)
+
+        send_email_with_attachment(
+            to_email="vorobev@intermatic.energy",
+            subject="Служебное задание",
+            body="Сформировано автоматически ботом командировок.",
+            file_path=docx_path,
         )
 
         # ─── итоговый вывод
