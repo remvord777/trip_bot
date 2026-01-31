@@ -5,7 +5,7 @@ from pathlib import Path
 SMTP_HOST = "lr600.intermatic.energy"
 SMTP_PORT = 3587
 SMTP_USER = "vorobev@intermatic.energy"
-SMTP_PASSWORD = "76ex9*c24B"   # ⚠️ лучше потом вынести в config.py
+SMTP_PASSWORD = ""   # ⚠️ лучше потом вынести в config.py
 
 
 def send_email_with_attachment(
