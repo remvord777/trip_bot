@@ -1,1 +1,6 @@
-BOT_TOKEN = "8397469699:AAHhqgVryjGGtichV5r9djml3oGq328ZETI"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")

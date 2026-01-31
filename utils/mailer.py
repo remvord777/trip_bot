@@ -1,11 +1,15 @@
+import os
 import smtplib
 from email.message import EmailMessage
 from pathlib import Path
+from dotenv import load_dotenv
 
-SMTP_HOST = "lr600.intermatic.energy"
-SMTP_PORT = 3587
-SMTP_USER = ""
-SMTP_PASSWORD = ""   # ⚠️ лучше потом вынести в config.py
+load_dotenv()
+
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 
 def send_email_with_attachment(
