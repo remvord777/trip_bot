@@ -63,7 +63,25 @@ def object_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def purpose_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Сервисное обслуживание ПТК АСУТП ПГУ и ДКС")],
+            [KeyboardButton(text="Сервис ПТК АСУТП")],
+            [KeyboardButton(text="❌ Отмена")]
+        ],
+        resize_keyboard=True
+    )
 
+def confirm_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="✅ Сохранить")],
+            [KeyboardButton(text="✏️ Изменить")],
+            [KeyboardButton(text="❌ Отмена")]
+        ],
+        resize_keyboard=True
+    )
 
 # ───────────────
 # КНОПКА ОТМЕНЫ
