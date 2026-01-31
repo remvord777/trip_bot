@@ -6,4 +6,5 @@ class TripStates(StatesGroup):
     date_from = State()
     date_to = State()
     purpose = State()
+    employee = State()
     confirm = State()

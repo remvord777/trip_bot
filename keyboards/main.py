@@ -83,6 +83,19 @@ def confirm_keyboard():
         resize_keyboard=True
     )
 
+def employee_keyboard():
+    from data.employees import EMPLOYEES
+
+    keyboard = [[KeyboardButton(text=name)] for name in EMPLOYEES]
+    keyboard.append([KeyboardButton(text="➕ Ввести вручную")])
+    keyboard.append([KeyboardButton(text="❌ Отмена")])
+
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True
+    )
+
+
 # ───────────────
 # КНОПКА ОТМЕНЫ
 # ───────────────

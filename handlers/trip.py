@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from aiogram.types import FSInputFile
+
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
@@ -12,7 +12,8 @@ from keyboards.main import (
     object_keyboard,
     cancel_keyboard,
     purpose_keyboard,
-    confirm_keyboard
+    confirm_keyboard,
+    employee_keyboard
 )
 from keyboards.calendar import build_calendar, current_calendar
 from db.database import get_connection
@@ -186,16 +187,44 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
 
 
 # ─────────────────────
-# ЦЕЛЬ → ПРЕДПРОСМОТР
+# ЦЕЛЬ → СОТРУДНИК
 # ─────────────────────
 @router.message(TripStates.purpose)
-async def preview_trip(message: Message, state: FSMContext):
+async def ask_employee(message: Message, state: FSMContext):
     await state.update_data(purpose=message.text)
+
+    await message.answer(
+        "──────────────\n"
+        "👤 СОТРУДНИК\n"
+        "──────────────\n\n"
+        "Выберите сотрудника\n"
+        "или введите ФИО вручную:",
+        reply_markup=employee_keyboard()
+    )
+    await state.set_state(TripStates.employee)
+
+
+# ─────────────────────
+# СОТРУДНИК (ФИО)
+# ─────────────────────
+@router.message(TripStates.employee)
+async def set_employee(message: Message, state: FSMContext):
+    if message.text == "➕ Ввести вручную":
+        await message.answer(
+            "Введите ФИО полностью\n"
+            "например:\n"
+            "Иванов Иван Иванович",
+            reply_markup=cancel_keyboard
+        )
+        return
+
+    await state.update_data(employee_name=message.text)
     data = await state.get_data()
 
     await message.answer(
         "📋 ПРОВЕРЬ ДАННЫЕ КОМАНДИРОВКИ\n"
         "──────────────\n\n"
+        f"👤 Сотрудник: {data['employee_name']}\n"
         f"🏙 Город: {data['city']}\n"
         f"🏢 Объект: {data['object']}\n\n"
         "📅 Даты:\n"
@@ -209,7 +238,7 @@ async def preview_trip(message: Message, state: FSMContext):
 
 
 # ─────────────────────
-# ПОДТВЕРЖДЕНИЕ → БД + DOCX + SUMMARY
+# ПОДТВЕРЖДЕНИЕ → БД + DOCX + ИТОГ
 # ─────────────────────
 @router.message(TripStates.confirm)
 async def confirm_trip(message: Message, state: FSMContext):
@@ -223,34 +252,36 @@ async def confirm_trip(message: Message, state: FSMContext):
 
     if message.text == "❌ Отмена":
         await state.clear()
-        await message.answer(
-            "❌ Командировка отменена",
-            reply_markup=main_menu
-        )
+        await message.answer("❌ Командировка отменена", reply_markup=main_menu)
         return
 
     if message.text == "✅ Сохранить":
         data = await state.get_data()
 
-        # ───── расчёт срока
+        # ─── приводим город к виду "г. Кириши"
+        city_value = data["city"].strip()
+        if not city_value.lower().startswith("г."):
+            city_value = f"г. {city_value}"
+
+        # ─── срок
         date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
         date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
         total = (date_to - date_from).days + 1
 
-        # ───── данные для DOCX
+        # ─── данные для DOCX
         doc_data = {
-            "city": data["city"],
+            "city": city_value,
             "object": data["object"],
             "date_fr": data["date_from"],
             "date_to": data["date_to"],
             "total": total,
             "purpose": data["purpose"],
-            "employee_name": "Иванов И.И.",
+            "employee_name": data["employee_name"],
             "position": "старший инженер",
             "contract": "335",
         }
 
-        # ───── БД
+        # ─── БД
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -259,7 +290,7 @@ async def confirm_trip(message: Message, state: FSMContext):
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                data["city"],
+                city_value,
                 data["object"],
                 data["date_from"],
                 data["date_to"],
@@ -269,20 +300,19 @@ async def confirm_trip(message: Message, state: FSMContext):
         conn.commit()
         conn.close()
 
-        # ───── DOCX
+        # ─── DOCX
         docx_path = generate_service_task(doc_data)
 
-        file = FSInputFile(docx_path)
-
         await message.answer_document(
-            document=file,
+            document=FSInputFile(docx_path),
             caption="📄 Служебное задание сформировано"
         )
 
-        # ───── ИТОГОВЫЙ ВЫВОД (С ФИШКАМИ)
+        # ─── итоговый вывод
         await message.answer(
             "✅ КОМАНДИРОВКА СОХРАНЕНА\n\n"
-            f"🏙 Город: {data['city']}\n"
+            f"👤 Сотрудник: {data['employee_name']}\n"
+            f"🏙 Город: {city_value}\n"
             f"🏢 Объект: {data['object']}\n\n"
             "📅 Даты:\n"
             f"🟢 {data['date_from']}\n"
