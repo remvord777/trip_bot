@@ -4,7 +4,7 @@ from pathlib import Path
 
 SMTP_HOST = "lr600.intermatic.energy"
 SMTP_PORT = 3587
-SMTP_USER = "vv@intermatic.energy"
+SMTP_USER = ""
 SMTP_PASSWORD = ""   # ⚠️ лучше потом вынести в config.py
 
 
