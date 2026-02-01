@@ -14,6 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 
 from states.trip import TripStates
+
 from keyboards.main import (
     main_menu,
     city_keyboard,
@@ -36,9 +37,9 @@ from data.emails import EMAIL_RECIPIENTS
 
 router = Router()
 
-# ─────────────────────
-# ГЛОБАЛЬНАЯ ОТМЕНА
-# ─────────────────────
+# ======================================================
+# ГЛОБАЛЬНАЯ ОТМЕНА (работает в любом состоянии)
+# ======================================================
 @router.message(StateFilter("*"), F.text == "❌ Отмена")
 async def cancel_anywhere(message: Message, state: FSMContext):
     await state.clear()
@@ -47,9 +48,10 @@ async def cancel_anywhere(message: Message, state: FSMContext):
         reply_markup=main_menu,
     )
 
-# ─────────────────────
-# СТАРТ
-# ─────────────────────
+
+# ======================================================
+# СТАРТ НОВОЙ КОМАНДИРОВКИ
+# ======================================================
 @router.message(F.text == "🧳 Новая командировка")
 async def start_trip(message: Message, state: FSMContext):
     await state.clear()
@@ -59,9 +61,10 @@ async def start_trip(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.city)
 
-# ─────────────────────
-# ГОРОД
-# ─────────────────────
+
+# ======================================================
+# ВЫБОР ГОРОДА
+# ======================================================
 @router.message(TripStates.city)
 async def set_city(message: Message, state: FSMContext):
     city = message.text.strip()
@@ -73,9 +76,10 @@ async def set_city(message: Message, state: FSMContext):
         location_data=location,
     )
 
-    # если в справочнике ровно один объект — подставляем автоматически
+    # Если в справочнике ровно один объект — подставляем автоматически
     if location and len(location.get("objects", {})) == 1:
         object_name, obj = next(iter(location["objects"].items()))
+
         await state.update_data(
             object=object_name,
             organization=obj.get("organization"),
@@ -92,12 +96,17 @@ async def set_city(message: Message, state: FSMContext):
         await state.set_state(TripStates.date_from)
         return
 
-    await message.answer("🏢 Объект", reply_markup=object_keyboard())
+    # Иначе — спрашиваем объект
+    await message.answer(
+        "🏢 Объект",
+        reply_markup=object_keyboard(),
+    )
     await state.set_state(TripStates.object)
 
-# ─────────────────────
-# ОБЪЕКТ
-# ─────────────────────
+
+# ======================================================
+# ВЫБОР / ВВОД ОБЪЕКТА
+# ======================================================
 @router.message(TripStates.object)
 async def set_object(message: Message, state: FSMContext):
     object_name = message.text.strip()
@@ -121,9 +130,10 @@ async def set_object(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.date_from)
 
-# ─────────────────────
-# КАЛЕНДАРЬ — НАЧАЛО
-# ─────────────────────
+
+# ======================================================
+# КАЛЕНДАРЬ — ДАТА НАЧАЛА
+# ======================================================
 @router.callback_query(TripStates.date_from)
 async def calendar_date_from(call: CallbackQuery, state: FSMContext):
     if call.data == "ignore":
@@ -147,9 +157,10 @@ async def calendar_date_from(call: CallbackQuery, state: FSMContext):
 
     elif call.data.startswith("date:"):
         selected = call.data.split(":")[1]
-        await state.update_data(date_from=selected)
 
+        await state.update_data(date_from=selected)
         await call.message.edit_reply_markup(reply_markup=None)
+
         await call.message.answer(
             f"🟢 Начало: {selected}\n\n🔴 Окончание",
             reply_markup=current_calendar(),
@@ -162,9 +173,10 @@ async def calendar_date_from(call: CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup(build_calendar(year, month))
     await call.answer()
 
-# ─────────────────────
-# КАЛЕНДАРЬ — ОКОНЧАНИЕ
-# ─────────────────────
+
+# ======================================================
+# КАЛЕНДАРЬ — ДАТА ОКОНЧАНИЯ
+# ======================================================
 @router.callback_query(TripStates.date_to)
 async def calendar_date_to(call: CallbackQuery, state: FSMContext):
     if call.data == "ignore":
@@ -188,18 +200,22 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
 
     elif call.data.startswith("date:"):
         selected = call.data.split(":")[1]
+
         start = datetime.strptime(data["date_from"], "%d.%m.%Y")
         end = datetime.strptime(selected, "%d.%m.%Y")
 
         if end < start:
-            await call.answer("Дата окончания раньше начала", show_alert=True)
+            await call.answer(
+                "Дата окончания раньше даты начала",
+                show_alert=True,
+            )
             return
 
         await state.update_data(date_to=selected)
         await call.message.edit_reply_markup(reply_markup=None)
 
         await call.message.answer(
-            "🎯 Цель командировки",
+            f"🔴 Окончание: {selected}\n\n🎯 Цель командировки",
             reply_markup=purpose_keyboard(),
         )
         await state.set_state(TripStates.purpose)
@@ -210,18 +226,23 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup(build_calendar(year, month))
     await call.answer()
 
-# ─────────────────────
-# ЦЕЛЬ → СОТРУДНИК
-# ─────────────────────
+
+# ======================================================
+# ЦЕЛЬ КОМАНДИРОВКИ
+# ======================================================
 @router.message(TripStates.purpose)
 async def ask_employee(message: Message, state: FSMContext):
     await state.update_data(purpose=message.text)
-    await message.answer("👤 Сотрудник", reply_markup=employee_keyboard())
+    await message.answer(
+        "👤 Сотрудник",
+        reply_markup=employee_keyboard(),
+    )
     await state.set_state(TripStates.employee)
 
-# ─────────────────────
+
+# ======================================================
 # СОТРУДНИК → ПОДТВЕРЖДЕНИЕ
-# ─────────────────────
+# ======================================================
 @router.message(TripStates.employee)
 async def set_employee(message: Message, state: FSMContext):
     name = message.text.strip()
@@ -249,20 +270,29 @@ async def set_employee(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.confirm)
 
-# ─────────────────────
-# ПОДТВЕРЖДЕНИЕ
-# ─────────────────────
+
+# ======================================================
+# ИЗМЕНИТЬ ИЗ ПОДТВЕРЖДЕНИЯ
+# ======================================================
 @router.message(TripStates.confirm, F.text == "✏️ Изменить")
 async def edit_from_confirm(message: Message, state: FSMContext):
-    await message.answer("👤 Выберите сотрудника заново:", reply_markup=employee_keyboard())
+    await message.answer(
+        "👤 Выберите сотрудника заново:",
+        reply_markup=employee_keyboard(),
+    )
     await state.set_state(TripStates.employee)
 
+
+# ======================================================
+# СОХРАНИТЬ → СЛУЖЕБНОЕ ЗАДАНИЕ
+# ======================================================
 @router.message(TripStates.confirm, F.text == "✅ Сохранить")
 async def confirm_trip(message: Message, state: FSMContext):
     data = await state.get_data()
 
     city = data["city"]
     prefix = data.get("settlement_prefix")
+
     if prefix:
         city = f"{prefix} {city}"
     elif not city.lower().startswith(("г.", "п.", "с.")):
@@ -285,6 +315,7 @@ async def confirm_trip(message: Message, state: FSMContext):
         "contract": data.get("contract", ""),
     }
 
+    # --- БД
     conn = get_connection()
     conn.execute(
         "INSERT INTO trips (city, place, date_from, date_to, purpose) VALUES (?, ?, ?, ?, ?)",
@@ -310,9 +341,10 @@ async def confirm_trip(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.ask_advance)
 
-# ─────────────────────
-# АВАНС
-# ─────────────────────
+
+# ======================================================
+# АВАНС: ДА / НЕТ
+# ======================================================
 @router.message(TripStates.ask_advance)
 async def ask_advance(message: Message, state: FSMContext):
     if message.text == "❌ Нет":
@@ -324,6 +356,10 @@ async def ask_advance(message: Message, state: FSMContext):
     await message.answer("Введите сумму аванса:")
     await state.set_state(TripStates.advance_amount)
 
+
+# ======================================================
+# СУММА АВАНСА → ДОКУМЕНТ → ВЫБОР ПОЧТЫ
+# ======================================================
 @router.message(TripStates.advance_amount)
 async def advance_amount(message: Message, state: FSMContext):
     if not message.text.isdigit():
@@ -357,19 +393,25 @@ async def advance_amount(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.after_documents)
 
-# ─────────────────────
-# ОТПРАВКА ПОЧТЫ
-# ─────────────────────
+
+# ======================================================
+# ОТПРАВКА ПОЧТЫ / ЗАВЕРШЕНИЕ
+# ======================================================
+@router.message(TripStates.after_documents, F.text == "✅ Завершить")
+async def finish_after_documents(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("✅ Процесс завершён", reply_markup=main_menu)
+
+
 @router.message(TripStates.after_documents)
 async def send_mail(message: Message, state: FSMContext):
-    if message.text == "❌ Завершить":
-        await message.answer("✅ Процесс завершён", reply_markup=main_menu)
-        await state.clear()
-        return
-
     recipients = EMAIL_RECIPIENTS.get(message.text)
+
     if not recipients:
-        await message.answer("Выберите вариант кнопкой")
+        await message.answer(
+            "Выберите вариант кнопкой",
+            reply_markup=email_select_keyboard(),
+        )
         return
 
     data = await state.get_data()
@@ -396,6 +438,7 @@ async def send_mail(message: Message, state: FSMContext):
     )
 
     await message.answer(
-        f"📨 Отправлено: {message.text}\nМожно отправить ещё или завершить процесс.",
+        f"📨 Отправлено: {message.text}\n\n"
+        "Можно отправить ещё или завершить процесс.",
         reply_markup=email_select_keyboard(),
     )
