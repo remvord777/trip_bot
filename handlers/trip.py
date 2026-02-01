@@ -51,18 +51,18 @@ async def start_trip(message: Message, state: FSMContext):
         "──────────────\n"
         "📍 МЕСТО КОМАНДИРОВКИ\n"
         "──────────────\n\n"
-        "🏙 Город",
+        "🏙 Населённый пункт",
         reply_markup=city_keyboard()
     )
     await state.set_state(TripStates.city)
 
 
 # ─────────────────────
-# ГОРОД
+# НАСЕЛЁННЫЙ ПУНКТ
 # ─────────────────────
 @router.message(TripStates.city)
 async def set_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
+    await state.update_data(city_raw=message.text)
     await message.answer(
         "🏢 Объект",
         reply_markup=object_keyboard()
@@ -196,7 +196,7 @@ async def set_employee(message: Message, state: FSMContext):
     await message.answer(
         f"📋 Проверь данные:\n\n"
         f"👤 {data['employee_name']}\n"
-        f"🏙 {data['city']}\n"
+        f"🏙 {data['city_raw']}\n"
         f"🏢 {data['object']}\n"
         f"🟢 {data['date_from']} — 🔴 {data['date_to']}\n\n"
         f"🎯 {data['purpose']}",
@@ -215,9 +215,17 @@ async def confirm_trip(message: Message, state: FSMContext):
 
     data = await state.get_data()
 
-    city = data["city"]
-    if not city.lower().startswith("г."):
-        city = f"г. {city}"
+    # нормализация населённого пункта
+    raw = data["city_raw"].strip()
+    prefix = "г."
+
+    for p in ("г.", "п.", "пгт.", "с."):
+        if raw.lower().startswith(p):
+            prefix = p
+            raw = raw[len(p):].strip()
+            break
+
+    city = f"{prefix} {raw}"
 
     date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
     date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
@@ -287,9 +295,11 @@ async def advance_amount(message: Message, state: FSMContext):
     await state.update_data(advance_amount=message.text)
     data = await state.get_data()
 
+    city = data["city_raw"]
+
     advance_path = generate_advance_request({
         "employee_name": data["employee_name"],
-        "city": data["city"],
+        "city": city,
         "object": data["object"],
         "date_from": data["date_from"],
         "date_to": data["date_to"],
@@ -304,7 +314,7 @@ async def advance_amount(message: Message, state: FSMContext):
 
     send_email_with_attachments(
         to_email="vorobev@intermatic.energy",
-        subject=f"Командировка — {data['city']} ({data['date_from']}–{data['date_to']})",
+        subject=f"Командировка — {city} ({data['date_from']}–{data['date_to']})",
         body=(
             "Добрый день.\n\n"
             "Направляю служебное задание и запрос аванса по командировке."
@@ -315,5 +325,8 @@ async def advance_amount(message: Message, state: FSMContext):
         ],
     )
 
-    await message.answer("✅ Процесс завершён", reply_markup=main_menu)
     await state.clear()
+    await message.answer(
+        "✅ Процесс завершён.\n\nВыберите действие:",
+        reply_markup=main_menu
+    )

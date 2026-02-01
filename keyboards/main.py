@@ -24,6 +24,17 @@ main_menu = ReplyKeyboardMarkup(
 # ───────────────
 # ГОРОДА
 # ───────────────
+def settlement_type_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🏙 Город")],
+            [KeyboardButton(text="🏘 Посёлок")],
+            [KeyboardButton(text="🏡 Село")],
+            [KeyboardButton(text="❌ Отмена")],
+        ],
+        resize_keyboard=True
+    )
+
 def city_keyboard() -> ReplyKeyboardMarkup:
     cities = get_last_cities()
 
@@ -33,7 +44,7 @@ def city_keyboard() -> ReplyKeyboardMarkup:
             "Кириши",
             "Адлер",
             "Крымск",
-            "п. Рефтинский"
+            "Рефтинский"
         ]
 
     keyboard = []
