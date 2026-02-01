@@ -104,6 +104,14 @@ def employee_keyboard():
         resize_keyboard=True
     )
 
+def after_trip_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="💰 Запрос аванса")],
+            [KeyboardButton(text="🏠 В главное меню")]
+        ],
+        resize_keyboard=True
+    )
 
 # ───────────────
 # КНОПКА ОТМЕНЫ

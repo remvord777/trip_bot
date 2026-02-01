@@ -36,6 +36,22 @@ def replace_placeholders(paragraph, data: dict):
         run._element.rPr.rFonts.set(qn("w:eastAsia"), "Times New Roman")
 
 
+
+def generate_money_advance(data: dict) -> Path:
+    doc = Document(ADVANCE_TEMPLATE_PATH)
+
+    replace_placeholders(doc, data)
+
+    filename = f"advance_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    output_path = OUTPUT_DIR / filename
+    doc.save(output_path)
+
+    return output_path
+
+
+
+
+
 def generate_service_task(data: dict) -> Path:
     doc = Document(TEMPLATE_PATH)
 

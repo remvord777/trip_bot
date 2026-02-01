@@ -1,17 +1,21 @@
 from datetime import date, datetime
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    FSInputFile,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
-
 
 from states.trip import TripStates
 from keyboards.main import (
     main_menu,
     city_keyboard,
     object_keyboard,
-    cancel_keyboard,
     purpose_keyboard,
     confirm_keyboard,
     employee_keyboard,
@@ -19,7 +23,8 @@ from keyboards.main import (
 from keyboards.calendar import build_calendar, current_calendar
 from db.database import get_connection
 from utils.docx_generator import generate_service_task
-from utils.mailer import send_email_with_attachment
+from utils.advance_docx_generator import generate_advance_request
+from utils.mailer import send_email_with_attachments
 
 router = Router()
 
@@ -46,8 +51,7 @@ async def start_trip(message: Message, state: FSMContext):
         "──────────────\n"
         "📍 МЕСТО КОМАНДИРОВКИ\n"
         "──────────────\n\n"
-        "🏙 Город\n"
-        "(начните вводить или выберите из популярных)",
+        "🏙 Город",
         reply_markup=city_keyboard()
     )
     await state.set_state(TripStates.city)
@@ -60,8 +64,7 @@ async def start_trip(message: Message, state: FSMContext):
 async def set_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
     await message.answer(
-        "🏢 Объект\n"
-        "(введите или выберите)",
+        "🏢 Объект",
         reply_markup=object_keyboard()
     )
     await state.set_state(TripStates.object)
@@ -78,17 +81,14 @@ async def set_object(message: Message, state: FSMContext):
     await state.update_data(cal=(today.year, today.month))
 
     await message.answer(
-        "──────────────\n"
-        "📅 ДАТЫ КОМАНДИРОВКИ\n"
-        "──────────────\n\n"
-        "🟢 Начало",
+        "📅 Даты командировки\n\n🟢 Начало",
         reply_markup=current_calendar()
     )
     await state.set_state(TripStates.date_from)
 
 
 # ─────────────────────
-# КАЛЕНДАРЬ — ДАТА НАЧАЛА
+# КАЛЕНДАРЬ — НАЧАЛО
 # ─────────────────────
 @router.callback_query(TripStates.date_from)
 async def calendar_date_from(call: CallbackQuery, state: FSMContext):
@@ -104,22 +104,17 @@ async def calendar_date_from(call: CallbackQuery, state: FSMContext):
         if month == 0:
             month = 12
             year -= 1
-
     elif call.data == "next":
         month += 1
         if month == 13:
             month = 1
             year += 1
-
     elif call.data.startswith("date:"):
         selected = call.data.split(":")[1]
         await state.update_data(date_from=selected)
-
         await call.message.edit_reply_markup(reply_markup=None)
-
         await call.message.answer(
-            f"🟢 Начало: {selected}\n\n"
-            "🔴 Окончание",
+            f"🟢 Начало: {selected}\n\n🔴 Окончание",
             reply_markup=current_calendar()
         )
         await state.set_state(TripStates.date_to)
@@ -127,12 +122,12 @@ async def calendar_date_from(call: CallbackQuery, state: FSMContext):
         return
 
     await state.update_data(cal=(year, month))
-    await call.message.edit_reply_markup(reply_markup=build_calendar(year, month))
+    await call.message.edit_reply_markup(build_calendar(year, month))
     await call.answer()
 
 
 # ─────────────────────
-# КАЛЕНДАРЬ — ДАТА ОКОНЧАНИЯ
+# КАЛЕНДАРЬ — ОКОНЧАНИЕ
 # ─────────────────────
 @router.callback_query(TripStates.date_to)
 async def calendar_date_to(call: CallbackQuery, state: FSMContext):
@@ -141,41 +136,31 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
         return
 
     data = await state.get_data()
-    year, month = data.get("cal", (date.today().year, date.today().month))
+    year, month = data.get("cal")
 
     if call.data == "prev":
         month -= 1
         if month == 0:
             month = 12
             year -= 1
-
     elif call.data == "next":
         month += 1
         if month == 13:
             month = 1
             year += 1
-
     elif call.data.startswith("date:"):
         selected = call.data.split(":")[1]
 
         start = datetime.strptime(data["date_from"], "%d.%m.%Y")
         end = datetime.strptime(selected, "%d.%m.%Y")
-
         if end < start:
-            await call.answer(
-                "Дата окончания не может быть раньше даты начала",
-                show_alert=True
-            )
+            await call.answer("Дата окончания раньше начала", show_alert=True)
             return
 
         await state.update_data(date_to=selected)
         await call.message.edit_reply_markup(reply_markup=None)
-
         await call.message.answer(
-            "──────────────\n"
-            "🎯 ЦЕЛЬ КОМАНДИРОВКИ\n"
-            "──────────────\n\n"
-            "Выберите вариант:",
+            "🎯 Цель командировки",
             reply_markup=purpose_keyboard()
         )
         await state.set_state(TripStates.purpose)
@@ -183,7 +168,7 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
         return
 
     await state.update_data(cal=(year, month))
-    await call.message.edit_reply_markup(reply_markup=build_calendar(year, month))
+    await call.message.edit_reply_markup(build_calendar(year, month))
     await call.answer()
 
 
@@ -193,20 +178,15 @@ async def calendar_date_to(call: CallbackQuery, state: FSMContext):
 @router.message(TripStates.purpose)
 async def ask_employee(message: Message, state: FSMContext):
     await state.update_data(purpose=message.text)
-
     await message.answer(
-        "──────────────\n"
-        "👤 СОТРУДНИК\n"
-        "──────────────\n\n"
-        "Выберите сотрудника\n"
-        "или введите ФИО вручную:",
+        "👤 Сотрудник",
         reply_markup=employee_keyboard()
     )
     await state.set_state(TripStates.employee)
 
 
 # ─────────────────────
-# СОТРУДНИК
+# СОТРУДНИК → ПОДТВЕРЖДЕНИЕ
 # ─────────────────────
 @router.message(TripStates.employee)
 async def set_employee(message: Message, state: FSMContext):
@@ -214,16 +194,12 @@ async def set_employee(message: Message, state: FSMContext):
     data = await state.get_data()
 
     await message.answer(
-        "📋 ПРОВЕРЬ ДАННЫЕ КОМАНДИРОВКИ\n"
-        "──────────────\n\n"
-        f"👤 Сотрудник: {data['employee_name']}\n"
-        f"🏙 Город: {data['city']}\n"
-        f"🏢 Объект: {data['object']}\n\n"
-        "📅 Даты:\n"
-        f"🟢 {data['date_from']}\n"
-        f"🔴 {data['date_to']}\n\n"
-        "🎯 Цель:\n"
-        f"{data['purpose']}",
+        f"📋 Проверь данные:\n\n"
+        f"👤 {data['employee_name']}\n"
+        f"🏙 {data['city']}\n"
+        f"🏢 {data['object']}\n"
+        f"🟢 {data['date_from']} — 🔴 {data['date_to']}\n\n"
+        f"🎯 {data['purpose']}",
         reply_markup=confirm_keyboard()
     )
     await state.set_state(TripStates.confirm)
@@ -239,95 +215,105 @@ async def confirm_trip(message: Message, state: FSMContext):
 
     data = await state.get_data()
 
-    city_value = data["city"].strip()
-    if not city_value.lower().startswith("г."):
-        city_value = f"г. {city_value}"
+    city = data["city"]
+    if not city.lower().startswith("г."):
+        city = f"г. {city}"
 
     date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
     date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
     total = (date_to - date_from).days + 1
 
     doc_data = {
-        "city": city_value,
+        "employee_name": data["employee_name"],
+        "city": city,
         "object": data["object"],
-        "date_fr": data["date_from"],
+        "date_from": data["date_from"],
         "date_to": data["date_to"],
         "total": total,
         "purpose": data["purpose"],
-        "employee_name": data["employee_name"],
         "position": "старший инженер",
-        "contract": "335",
+        "contract": "ИМ-026/17",
     }
 
-    # БД
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO trips (city, place, date_from, date_to, purpose)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            city_value,
-            data["object"],
-            data["date_from"],
-            data["date_to"],
-            data["purpose"]
-        )
+    conn.execute(
+        "INSERT INTO trips (city, place, date_from, date_to, purpose) VALUES (?, ?, ?, ?, ?)",
+        (city, data["object"], data["date_from"], data["date_to"], data["purpose"])
     )
     conn.commit()
     conn.close()
 
-    # DOCX — ОДИН РАЗ
-    docx_path = generate_service_task(doc_data)
+    service_task_path = generate_service_task(doc_data)
+    await state.update_data(service_task_path=service_task_path)
 
     await message.answer_document(
-        document=FSInputFile(docx_path),
+        FSInputFile(service_task_path),
         caption="📄 Служебное задание сформировано"
     )
 
-
-    subject = (
-        f"Служебное задание — {city_value} "
-        f"({data['date_from']} – {data['date_to']})"
-    )
-
-    body = (
-        "Добрый день.\n\n"
-        f"Прошу оформить командировку {city_value} {data['object']} "
-        f"с {data['date_from']} по {data['date_to']}.\n\n"
-        "Командировка от АО «Интерматик».\n\n"
-        "Служебное задание во вложении.\n\n"
-        "—\n"
-        "Бот командировок"
-    )
-
-    send_email_with_attachment(
-        to_email="vorobev@intermatic.energy",
-        subject=subject,
-        body=body,
-        file_path=docx_path,
-    )
-
-    # send_email_with_attachment(
-    #     to_email="vorobev@intermatic.energy",
-    #     subject="Служебное задание",
-    #     body="Сформировано автоматически ботом командировок.",
-    #     file_path=docx_path,
-    # )
-
     await message.answer(
-        "✅ КОМАНДИРОВКА СОХРАНЕНА\n\n"
-        f"👤 Сотрудник: {data['employee_name']}\n"
-        f"🏙 Город: {city_value}\n"
-        f"🏢 Объект: {data['object']}\n\n"
-        "📅 Даты:\n"
-        f"🟢 {data['date_from']}\n"
-        f"🔴 {data['date_to']}\n"
-        f"⏱ Срок: {total} суток\n\n"
-        "🎯 Цель:\n"
-        f"{data['purpose']}",
-        reply_markup=main_menu
+        "💰 Нужен запрос аванса?",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="✅ Да"), KeyboardButton(text="❌ Нет")]],
+            resize_keyboard=True
+        )
+    )
+    await state.set_state(TripStates.ask_advance)
+
+
+# ─────────────────────
+# НУЖЕН ЛИ АВАНС
+# ─────────────────────
+@router.message(TripStates.ask_advance)
+async def ask_advance(message: Message, state: FSMContext):
+    if message.text == "❌ Нет":
+        await message.answer("Готово", reply_markup=main_menu)
+        await state.clear()
+        return
+
+    await message.answer("Введите сумму аванса:")
+    await state.set_state(TripStates.advance_amount)
+
+
+# ─────────────────────
+# АВАНС → DOCX → MAIL
+# ─────────────────────
+@router.message(TripStates.advance_amount)
+async def advance_amount(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Введите сумму цифрами")
+        return
+
+    await state.update_data(advance_amount=message.text)
+    data = await state.get_data()
+
+    advance_path = generate_advance_request({
+        "employee_name": data["employee_name"],
+        "city": data["city"],
+        "object": data["object"],
+        "date_from": data["date_from"],
+        "date_to": data["date_to"],
+        "contract": "ИМ-026/17",
+        "advance_amount": data["advance_amount"],
+    })
+
+    await message.answer_document(
+        FSInputFile(advance_path),
+        caption="💰 Запрос аванса сформирован"
     )
 
+    send_email_with_attachments(
+        to_email="vorobev@intermatic.energy",
+        subject=f"Командировка — {data['city']} ({data['date_from']}–{data['date_to']})",
+        body=(
+            "Добрый день.\n\n"
+            "Направляю служебное задание и запрос аванса по командировке."
+        ),
+        file_paths=[
+            data["service_task_path"],
+            advance_path,
+        ],
+    )
+
+    await message.answer("✅ Процесс завершён", reply_markup=main_menu)
     await state.clear()
