@@ -5,7 +5,6 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 from datetime import date, timedelta
-
 from data.locations import LOCATIONS
 
 
@@ -15,11 +14,13 @@ from data.locations import LOCATIONS
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🧳 Новая командировка")],
+        [KeyboardButton(text="📄 Авансовый отчёт")],
         [KeyboardButton(text="📋 Мои командировки")],
         [KeyboardButton(text="ℹ️ Помощь")],
     ],
     resize_keyboard=True,
 )
+
 
 
 # ─────────────────────
