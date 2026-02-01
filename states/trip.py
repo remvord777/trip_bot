@@ -16,3 +16,6 @@ class TripStates(StatesGroup):
     # ───── ДОБАВЛЕНО ─────
     ask_advance = State()        # ❓ нужен ли аванс
     advance_amount = State()    # 💰 сумма аванса
+    # ⬇️ ВОТ ЭТОГО НЕ ХВАТАЛО
+    select_email = State()
+
