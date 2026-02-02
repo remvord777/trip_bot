@@ -9,7 +9,6 @@ from db.database import init_db
 # handlers
 from handlers import start, auth
 from handlers.trip import trip, calendar
-from handlers.advance_report.router import router as advance_report_router
 
 
 async def main():
@@ -32,7 +31,6 @@ async def main():
     dp.include_router(start.router)
     dp.include_router(trip.router)
     dp.include_router(calendar.router)
-    dp.include_router(advance_report_router)
 
     # ─────────────────────
     # START
