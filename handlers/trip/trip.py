@@ -201,6 +201,46 @@ async def confirm_trip(message: Message, state: FSMContext):
     )
     await state.set_state(TripStates.ask_advance)
 
+
+# ======================================================
+# 💰 АВАНС
+# ======================================================
+@router.message(TripStates.ask_advance)
+async def ask_advance(message: Message, state: FSMContext):
+    if message.text == "❌ Нет":
+        await state.update_data(advance_amount="0")
+        await message.answer("Аванс: 0 ₽", reply_markup=ReplyKeyboardRemove())
+        await state.set_state(TripStates.advance_amount)
+        return
+
+    await message.answer("Введите сумму аванса:")
+    await state.set_state(TripStates.advance_amount)
+
+
+@router.message(TripStates.advance_amount)
+async def advance_amount(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Введите сумму цифрами")
+        return
+
+    await state.update_data(advance_amount=message.text)
+    data = await state.get_data()
+
+    advance_path = generate_advance_request(data)
+    await state.update_data(advance_path=advance_path)
+
+    await message.answer_document(
+        FSInputFile(advance_path),
+        caption=f"💰 Запрос аванса сформирован ({data['advance_amount']} ₽)",
+    )
+
+    await message.answer(
+        "📨 Отправить документы:",
+        reply_markup=email_select_keyboard(),
+    )
+    await state.set_state(TripStates.after_documents)
+
+
 # ======================================================
 # ✅ ЗАВЕРШИТЬ
 # ======================================================
@@ -209,6 +249,44 @@ async def finish_after_documents(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("✅ Процесс завершён", reply_markup=main_menu)
 
+
+# ======================================================
+# 📨 ОТПРАВКА ПОЧТЫ
+# ======================================================
+@router.message(TripStates.after_documents)
+async def send_mail(message: Message, state: FSMContext):
+    recipients = EMAIL_RECIPIENTS.get(message.text)
+
+    if not recipients:
+        await message.answer(
+            "Выберите вариант кнопкой",
+            reply_markup=email_select_keyboard(),
+        )
+        return
+
+    data = await state.get_data()
+
+    body = (
+        "Добрый день.\n\n"
+        "Направляю служебное задание и запрос аванса по командировке.\n\n"
+        f"{data.get('employee_signature', '')}"
+    )
+
+    send_email_with_attachments(
+        to_email=", ".join(recipients),
+        subject=f"Командировка — {data['city']} ({data['date_from']}–{data['date_to']})",
+        body=body,
+        file_paths=[
+            data["service_task_path"],
+            data.get("advance_path"),
+        ],
+    )
+
+    await message.answer(
+        f"📨 Отправлено: {message.text}\n\n"
+        "Можно отправить ещё или завершить процесс.",
+        reply_markup=email_select_keyboard(),
+    )
 # ======================================================
 # 📄 АВАНСОВЫЙ ОТЧЁТ — СТАРТ
 # ======================================================
