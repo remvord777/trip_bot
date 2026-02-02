@@ -1,1 +1,0 @@
-AUTHORIZED_USERS = set()

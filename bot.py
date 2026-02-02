@@ -1,42 +1,42 @@
 import asyncio
+import logging
+import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from dotenv import load_dotenv
 
-from config import BOT_TOKEN
-from db.database import init_db
+from handlers import start, trip
 
-# handlers
-from handlers import start, auth
-from handlers.trip import trip, calendar
+from pathlib import Path
+from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+# ================== ENV ==================
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# ================== LOGGING ==================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ================== BOT ==================
+bot = Bot(token=BOT_TOKEN)
+
+# 🔥 ОБЯЗАТЕЛЬНО: FSM storage
+dp = Dispatcher(storage=MemoryStorage())
+
+# ================== ROUTERS ==================
+dp.include_router(start.router)
+dp.include_router(trip.router)
+
+# ================== MAIN ==================
 async def main():
-    # ─────────────────────
-    # ИНИЦИАЛИЗАЦИЯ БД
-    # ─────────────────────
-    init_db()
-
-    # ─────────────────────
-    # BOT / DISPATCHER
-    # ─────────────────────
-    bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher(storage=MemoryStorage())
-
-    # ─────────────────────
-    # ROUTERS
-    # порядок важен ТОЛЬКО для auth
-    # ─────────────────────
-    dp.include_router(auth.router)
-    dp.include_router(start.router)
-    dp.include_router(trip.router)
-    dp.include_router(calendar.router)
-
-    # ─────────────────────
-    # START
-    # ─────────────────────
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

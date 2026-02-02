@@ -1,8 +1,0 @@
-# runtime
-generated/
-db.sqlite3
-.venv/
-.idea/
-__pycache__/
-.env
-db.sqlite3

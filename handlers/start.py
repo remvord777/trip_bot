@@ -1,53 +1,32 @@
-from aiogram import Router
-from aiogram.filters import Command
+from aiogram import Router, F
 from aiogram.types import Message
+from aiogram.fsm.context import FSMContext
 
+from data.employees import EMPLOYEES
 from keyboards.main import main_menu
-from db.database import get_all_trips
 
 router = Router()
 
 
-@router.message(Command("start"))
-async def start_handler(message: Message):
-    await message.answer(
-        "Привет 👋\n"
-        "Я помогу вести учёт командировок по России.\n\n"
-        "Выберите действие:",
-        reply_markup=main_menu
-    )
+@router.message(F.text == "/start")
+async def start_handler(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    employee = EMPLOYEES.get(user_id)
 
-
-@router.message(lambda message: message.text == "📋 Мои командировки")
-async def my_trips(message: Message):
-    trips = get_all_trips()
-
-    if not trips:
-        await message.answer("📋 Командировок пока нет.")
+    if not employee:
+        await message.answer(f"Твой telegram_id: {user_id}")
         return
 
-    text = "📋 Ваши командировки:\n\n"
+    await state.clear()  # ✅ ТОЛЬКО ЗДЕСЬ
 
-    for trip in trips:
-        trip_id, city, place, date_from, date_to, purpose = trip
+    await state.update_data(
+        employee_name=employee["employee_name"],
+        position=employee["position"],
+    )
 
-        text += (
-            f"#{trip_id}\n"
-            f"🏙 {city}\n"
-            f"🏢 {place}\n"
-            f"📅 {date_from} → {date_to}\n"
-            f"🎯 {purpose}\n\n"
-        )
-
-    await message.answer(text)
-
-
-@router.message(lambda message: message.text == "ℹ️ Помощь")
-async def help_message(message: Message):
     await message.answer(
-        "ℹ️ Помощь\n\n"
-        "Этот бот помогает вести учёт командировок:\n"
-        "— создание командировок\n"
-        "— просмотр истории\n"
-        "— хранение данных"
+        f"Вы вошли как:\n"
+        f"{employee['employee_name']}\n"
+        f"{employee['position']}",
+        reply_markup=main_menu,
     )

@@ -1,10 +1,12 @@
 from datetime import datetime
-from keyboards.main import purpose_keyboard
+
 from aiogram import Router
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
-from states.trip import TripStates
+
+from handlers.trip.states import TripStates
 from keyboards.calendar import build_calendar, current_calendar
+from keyboards.main import purpose_keyboard
 
 router = Router()
 
@@ -42,7 +44,7 @@ async def calendar_date_from(call: CallbackQuery, state: FSMContext):
         )
         await state.set_state(TripStates.date_to)
         await call.answer()
-        return  # 🔴 важно — без мигания
+        return
 
     await state.update_data(cal=(year, month))
     await call.message.edit_reply_markup(build_calendar(year, month))
