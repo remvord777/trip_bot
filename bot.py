@@ -5,21 +5,36 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
 from db.database import init_db
-from handlers import start, trip, auth
+
+# handlers
+from handlers import start, auth
+from handlers.trip import trip, calendar
 
 
 async def main():
-    # 🔹 инициализация БД ДО запуска бота
+    # ─────────────────────
+    # ИНИЦИАЛИЗАЦИЯ БД
+    # ─────────────────────
     init_db()
 
+    # ─────────────────────
+    # BOT / DISPATCHER
+    # ─────────────────────
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # 🔐 ВАЖНО: auth.router — ПЕРВЫМ
+    # ─────────────────────
+    # ROUTERS
+    # порядок важен ТОЛЬКО для auth
+    # ─────────────────────
     dp.include_router(auth.router)
     dp.include_router(start.router)
     dp.include_router(trip.router)
+    dp.include_router(calendar.router)
 
+    # ─────────────────────
+    # START
+    # ─────────────────────
     await dp.start_polling(bot)
 
 
