@@ -74,7 +74,7 @@ async def trip_date_to(call: CallbackQuery, state: FSMContext):
     await state.update_data(date_to=call.data)
 
     await call.message.answer(
-        "🎯 Выберите цель / получателей:",
+        "🎯 Выберите получателей:",
         reply_markup=email_targets_keyboard(selected=[]),
     )
 
@@ -83,7 +83,7 @@ async def trip_date_to(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-# ================== PURPOSE (MULTISELECT) ==================
+# ================== PURPOSE (EMAILS) ==================
 
 @router.callback_query(TripStates.purpose)
 async def trip_purpose(call: CallbackQuery, state: FSMContext):
@@ -91,8 +91,15 @@ async def trip_purpose(call: CallbackQuery, state: FSMContext):
     selected: list[str] = data.get("emails", [])
     value = call.data
 
-    # ----- кнопка "Далее" -----
-    if value == "confirm":
+    # 🔥 КНОПКА "➡️ Далее"
+    if value == "emails_done":
+        if not selected:
+            await call.answer(
+                "❗ Выберите хотя бы одного получателя",
+                show_alert=True,
+            )
+            return
+
         await state.update_data(purpose=",".join(selected))
 
         text = (
@@ -100,7 +107,7 @@ async def trip_purpose(call: CallbackQuery, state: FSMContext):
             f"📍 Город: {data['city']}\n"
             f"🟢 Начало: {data['date_from']}\n"
             f"🔴 Окончание: {data['date_to']}\n"
-            f"🎯 Получатели: {', '.join(selected)}\n\n"
+            f"📧 Получатели: {', '.join(selected)}\n\n"
             "Подтвердить?"
         )
 
@@ -125,8 +132,7 @@ async def trip_purpose(call: CallbackQuery, state: FSMContext):
             reply_markup=email_targets_keyboard(selected=selected)
         )
     except TelegramBadRequest:
-        # ⬅️ message is not modified — НОРМАЛЬНО
-        pass
+        pass  # message is not modified — нормально
 
     await call.answer()
 
@@ -137,19 +143,12 @@ async def trip_purpose(call: CallbackQuery, state: FSMContext):
 async def trip_confirm(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    employee_name = data.get("employee_name")
-    position = data.get("position")
-
     docx_file = render_docx(
         template_name="service_task.docx",
-        data={
-            **data,
-            "employee_name": employee_name,
-            "position": position,
-        },
+        data=data,
     )
 
-    to_emails: list[str] = data.get("emails", [])
+    to_emails: list[str] = data["emails"]
 
     send_email(
         to_emails=to_emails,

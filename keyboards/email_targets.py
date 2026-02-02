@@ -2,23 +2,23 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from data.email_targets import EMAIL_TARGETS
 
 
-def email_targets_keyboard(selected: set[str]):
-    buttons = []
+def email_targets_keyboard(selected: list[str]):
+    keyboard = []
 
-    for key, item in EMAIL_TARGETS.items():
-        prefix = "✅ " if key in selected else ""
-        buttons.append([
+    for email in EMAIL_TARGETS:
+        prefix = "✅ " if email in selected else ""
+        keyboard.append([
             InlineKeyboardButton(
-                text=prefix + item["label"],
-                callback_data=f"email:{key}",
+                text=f"{prefix}{email}",
+                callback_data=email,
             )
         ])
 
-    buttons.append([
+    keyboard.append([
         InlineKeyboardButton(
-            text="📤 Отправить",
-            callback_data="email:send",
+            text="➡️ Далее",
+            callback_data="emails_done",
         )
     ])
 
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)

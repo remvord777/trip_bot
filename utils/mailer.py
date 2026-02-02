@@ -10,6 +10,9 @@ def send_email(
     body: str,
     attachment: Path,
 ):
+    if not to_emails:
+        raise RuntimeError("Список получателей пуст — письмо не отправлено")
+
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")
