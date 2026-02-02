@@ -14,7 +14,7 @@ from data.locations import LOCATIONS
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🧳 Новая командировка")],
-        [KeyboardButton(text="📄 Авансовый отчёт")],
+        [KeyboardButton(text="📄 Авансовый отчёт")], #->handlers/advance_report/router.py
         [KeyboardButton(text="📋 Мои командировки")],
         [KeyboardButton(text="ℹ️ Помощь")],
     ],
