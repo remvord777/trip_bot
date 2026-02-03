@@ -1,5 +1,7 @@
+# data/email_targets.py
+
 EMAIL_TARGETS = {
-    "self": "vorobev@intermatic.energy",
-    "accounting": "accounting@intermatic.energy",
-    "project_manager": "pm@intermatic.energy",
+    "me": "vorobev@intermatic.energy",
+    "office_im": "dev-null@localhost",
+    "office_ik": "dev-null@localhost",
 }

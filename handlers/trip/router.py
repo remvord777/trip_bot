@@ -3,16 +3,20 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime
+from pathlib import Path
 
 from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
 from keyboards.services import services_keyboard
 from keyboards.confirm import confirm_keyboard, advance_keyboard
+from keyboards.email_targets import email_targets_keyboard
 
 from data.locations import LOCATIONS
 from data.services import SERVICES
+from data.email_targets import EMAIL_TARGETS
 
 from utils.docx_render import render_docx
+from utils.mailer import send_email
 
 router = Router()
 
@@ -26,13 +30,13 @@ class TripStates(StatesGroup):
     service = State()
     confirm = State()
     advance_sum = State()
+    email_select = State()
 
 
 # ================= START =================
 
 @router.message(F.text == "🧳 Командировка")
 async def trip_start(message: Message, state: FSMContext):
-    # В state УЖЕ лежат employee_name / position / email (из /start)
     await message.answer(
         "📍 Выберите город командировки:",
         reply_markup=locations_keyboard(),
@@ -45,10 +49,18 @@ async def trip_start(message: Message, state: FSMContext):
 @router.message(TripStates.location)
 async def trip_location(message: Message, state: FSMContext):
     city = message.text
-    location = LOCATIONS[city]
+    location = LOCATIONS.get(city)
 
-    object_key = next(iter(location["objects"]))
-    obj = location["objects"][object_key]
+    if not location:
+        await message.answer("❗ Выберите город кнопкой")
+        return
+
+    objects = location.get("objects", {})
+    if not objects:
+        await message.answer("❗ Для этого города нет объектов")
+        return
+
+    object_key, obj = next(iter(objects.items()))
 
     await state.update_data(
         city=city,
@@ -69,8 +81,7 @@ async def trip_location(message: Message, state: FSMContext):
 
 @router.callback_query(TripStates.date_from, F.data.startswith("date:"))
 async def date_from(call: CallbackQuery, state: FSMContext):
-    date = call.data.replace("date:", "")
-    await state.update_data(date_from=date)
+    await state.update_data(date_from=call.data.replace("date:", ""))
 
     await call.message.answer(
         "🔴 Дата окончания командировки:",
@@ -84,8 +95,7 @@ async def date_from(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(TripStates.date_to, F.data.startswith("date:"))
 async def date_to(call: CallbackQuery, state: FSMContext):
-    date = call.data.replace("date:", "")
-    await state.update_data(date_to=date)
+    await state.update_data(date_to=call.data.replace("date:", ""))
 
     await call.message.answer(
         "🛠 Выберите вид сервисных работ:",
@@ -100,7 +110,11 @@ async def date_to(call: CallbackQuery, state: FSMContext):
 @router.callback_query(TripStates.service, F.data.startswith("service:"))
 async def service_selected(call: CallbackQuery, state: FSMContext):
     service_key = call.data.replace("service:", "")
-    service_title = SERVICES[service_key]
+    service_title = SERVICES.get(service_key)
+
+    if not service_title:
+        await call.answer("Ошибка выбора сервиса", show_alert=True)
+        return
 
     await state.update_data(service=service_title)
     data = await state.get_data()
@@ -129,13 +143,15 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
 async def confirm_trip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    file_path = render_docx(
+    file_path = Path(render_docx(
         template_name="service_task.docx",
         data={
             **data,
             "apply_date": datetime.now().strftime("%d.%m.%Y"),
         },
-    )
+    ))
+
+    await state.update_data(files=[file_path])
 
     await call.message.answer_document(
         FSInputFile(file_path),
@@ -144,8 +160,6 @@ async def confirm_trip(call: CallbackQuery, state: FSMContext):
     )
     await call.answer()
 
-
-# ================= ADVANCE =================
 
 # ================= ADVANCE =================
 
@@ -158,8 +172,13 @@ async def advance_start(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "advance_no")
 async def advance_cancel(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("✅ Командировка оформлена без аванса")
-    await state.clear()
+    await state.update_data(email_targets=[])
+
+    await call.message.answer(
+        "📧 Кому отправить документы?",
+        reply_markup=email_targets_keyboard([]),
+    )
+    await state.set_state(TripStates.email_select)
     await call.answer()
 
 
@@ -174,17 +193,66 @@ async def advance_sum_entered(message: Message, state: FSMContext):
     await state.update_data(advance_amount=amount)
     data = await state.get_data()
 
-    file_path = render_docx(
+    file_path = Path(render_docx(
         template_name="money_avans.docx",
         data={
             **data,
             "apply_date": datetime.now().strftime("%d.%m.%Y"),
         },
-    )
+    ))
+
+    files = data.get("files", [])
+    files.append(file_path)
+
+    await state.update_data(files=files, email_targets=[])
 
     await message.answer_document(
         FSInputFile(file_path),
         caption="💰 Авансовый запрос сформирован",
     )
 
-    await state.clear()
+    await message.answer(
+        "📧 Кому отправить документы?",
+        reply_markup=email_targets_keyboard([]),
+    )
+    await state.set_state(TripStates.email_select)
+
+
+# ================= EMAIL =================
+
+@router.callback_query(TripStates.email_select, F.data.startswith("email:"))
+async def email_select(call: CallbackQuery, state: FSMContext):
+    action = call.data.replace("email:", "")
+    data = await state.get_data()
+    selected = data.get("email_targets", [])
+
+    if action == "send":
+        if not selected:
+            await call.answer("Выберите получателя", show_alert=True)
+            return
+
+        recipients = [EMAIL_TARGETS[k] for k in selected]
+
+        send_email(
+            to_emails=recipients,
+            subject="Командировочные документы",
+            body="Документы во вложении",
+            attachments=data["files"],
+        )
+
+        await call.message.answer("✅ Документы отправлены")
+        await state.clear()
+        await call.answer()
+        return
+
+    if action in selected:
+        selected.remove(action)
+    else:
+        selected.append(action)
+
+    await state.update_data(email_targets=selected)
+
+    await call.message.edit_reply_markup(
+        reply_markup=email_targets_keyboard(selected)
+    )
+    await call.answer()
