@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime
 from pathlib import Path
+from utils.email_templates import build_subject, build_body
 
 from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
@@ -235,8 +236,8 @@ async def email_select(call: CallbackQuery, state: FSMContext):
 
         send_email(
             to_emails=recipients,
-            subject="Командировочные документы",
-            body="Документы во вложении",
+            subject=build_subject(data),
+            body=build_body(data),
             attachments=data["files"],
         )
 

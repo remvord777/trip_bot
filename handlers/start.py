@@ -1,6 +1,7 @@
 import logging
 
-from aiogram import Router, F
+from aiogram import Router
+from aiogram.filters import CommandStart
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 
@@ -11,11 +12,12 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.message(F.text == "/start")
+@router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext):
     telegram_id = message.from_user.id
     logger.info("START | telegram_id=%s", telegram_id)
 
+    # очищаем FSM на старте
     await state.clear()
 
     employee = EMPLOYEES.get(telegram_id)
@@ -28,7 +30,7 @@ async def start_handler(message: Message, state: FSMContext):
         )
         return
 
-    # сохраняем сотрудника в FSM
+    # сохраняем сотрудника в FSM (multi-user)
     await state.update_data(
         employee_name=employee["employee_name"],
         position=employee["position"],
@@ -42,6 +44,6 @@ async def start_handler(message: Message, state: FSMContext):
         f"💼 {employee['position']}\n"
         f"🆔 <code>{telegram_id}</code>\n\n"
         "Выберите действие:",
-        reply_markup=main_menu,   # ❗ БЕЗ ()
+        reply_markup=main_menu,  # ❗ правильно — БЕЗ ()
         parse_mode="HTML",
     )
