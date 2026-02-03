@@ -2,13 +2,14 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from pathlib import Path   # ← ВОТ ЭТОГО НЕ ХВАТАЛО
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
 
 from handlers.start import router as start_router
 from handlers.trip.router import router as trip_router
+from handlers.expense.router import router as expense_router
 
 
 # ================== ENV ==================
@@ -20,6 +21,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN not set")
 
+
 # ================== LOGGING ==================
 
 logging.basicConfig(
@@ -29,15 +31,19 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
 # ================== BOT ==================
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+
 # ================== ROUTERS ==================
 
 dp.include_router(start_router)
 dp.include_router(trip_router)
+dp.include_router(expense_router)
+
 
 # ================== MAIN ==================
 

@@ -6,6 +6,10 @@ from datetime import datetime
 from pathlib import Path
 from utils.email_templates import build_subject, build_body
 
+from data.trips_store import load_trips, save_trips
+
+from keyboards.main import main_menu
+
 from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
 from keyboards.services import services_keyboard
@@ -18,6 +22,8 @@ from data.email_targets import EMAIL_TARGETS
 
 from utils.docx_render import render_docx
 from utils.mailer import send_email
+from data.employees import EMPLOYEES
+
 
 router = Router()
 
@@ -36,15 +42,36 @@ class TripStates(StatesGroup):
 
 # ================= START =================
 
+# @router.message(F.text == "🧳 Командировка")
+# async def trip_start(message: Message, state: FSMContext):
+#     await message.answer(
+#         "📍 Выберите город командировки:",
+#         reply_markup=locations_keyboard(),
+#     )
+#     await state.set_state(TripStates.location)
+#
 @router.message(F.text == "🧳 Командировка")
 async def trip_start(message: Message, state: FSMContext):
+    telegram_id = message.from_user.id
+    employee = EMPLOYEES.get(telegram_id)
+
+    if not employee:
+        await message.answer("❗ Сотрудник не найден. Выполните /start")
+        return
+
+    # 🔥 ГАРАНТИЯ ДАННЫХ
+    await state.update_data(
+        employee_name=employee["employee_name"],
+        position=employee["position"],
+        email=employee["email"],
+        signature=employee["signature"],
+    )
+
     await message.answer(
         "📍 Выберите город командировки:",
         reply_markup=locations_keyboard(),
     )
     await state.set_state(TripStates.location)
-
-
 # ================= LOCATION =================
 
 @router.message(TripStates.location)
@@ -231,40 +258,78 @@ async def advance_sum_entered(message: Message, state: FSMContext):
 
 # ================= EMAIL =================
 
+from keyboards.main import main_menu
+from data.trips_store import load_trips, save_trips
+
 @router.callback_query(TripStates.email_select, F.data.startswith("email:"))
 async def email_select(call: CallbackQuery, state: FSMContext):
     action = call.data.replace("email:", "")
     data = await state.get_data()
     selected = data.get("email_targets", [])
 
+    # ================= SEND =================
     if action == "send":
         if not selected:
             await call.answer("Выберите получателя", show_alert=True)
             return
 
-        recipients = []
+        # --- формируем список получателей ---
+        recipients: list[str] = []
         for key in selected:
             if key == "me":
-                recipients.append(data["email"])
+                recipients.append(data.get("email", ""))
             else:
-                recipients.append(EMAIL_TARGETS[key])
+                recipients.append(EMAIL_TARGETS.get(key, ""))
 
+        recipients = [r for r in recipients if r]  # защита от пустых
+
+        # --- отправка письма ---
         send_email(
             to_emails=recipients,
             subject=build_subject(data),
             body=build_body(data),
-            attachments=data["files"],
+            attachments=data.get("files", []),
         )
 
+        # --- уведомление пользователю ---
         await call.message.answer(
             "✅ Документы отправлены\n\n"
             "Кому:\n"
             + "\n".join(f"• {email}" for email in recipients)
         )
 
+        # ================= SAVE TRIP =================
+
+        trips = load_trips()
+        uid = str(call.from_user.id)
+
+        trips.setdefault(uid, [])
+
+        trips[uid].append({
+            "trip_id": len(trips[uid]) + 1,
+            "city": data.get("city"),
+            "object_name": data.get("object_name"),
+            "date_from": data.get("date_from"),
+            "date_to": data.get("date_to"),
+            "total": data.get("total"),
+            "files": [str(p) for p in data.get("files", [])],
+        })
+
+        save_trips(trips)
+
+        # ================= BACK TO MENU =================
+
         await state.clear()
+
+        await call.message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu,
+        )
+
         await call.answer()
         return
+
+    # ================= TOGGLE EMAIL =================
 
     if action in selected:
         selected.remove(action)
