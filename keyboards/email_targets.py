@@ -1,18 +1,24 @@
-# keyboards/email_targets.py
-
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from data.email_targets import EMAIL_TARGETS
 
 
-def email_targets_keyboard(selected: list[str]):
+# красивые названия кнопок
+EMAIL_TITLES = {
+    "me": "👤 Мне",
+    "office_im": "🏢 Офис ИМ",
+    "office_ik": "🏢 Офис ИК",
+}
+
+
+def email_targets_keyboard(selected: list[str]) -> InlineKeyboardMarkup:
     keyboard = []
 
-    for alias in EMAIL_TARGETS:
-        prefix = "✅ " if alias in selected else ""
+    for key in EMAIL_TITLES:
+        checked = "✅ " if key in selected else ""
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{prefix}{alias}",
-                callback_data=f"email:{alias}",
+                text=f"{checked}{EMAIL_TITLES[key]}",
+                callback_data=f"email:{key}",
             )
         ])
 

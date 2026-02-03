@@ -241,7 +241,27 @@ async def email_select(call: CallbackQuery, state: FSMContext):
             attachments=data["files"],
         )
 
-        await call.message.answer("✅ Документы отправлены")
+        # ===== ВОТ ЭТА ЧАСТЬ =====
+        # lines = []
+        # for key in selected:
+        #     email = EMAIL_TARGETS.get(key, "—")
+        #     lines.append(f"• {key} — {email}")
+        #
+        # await call.message.answer(
+        #     "✅ Документы отправлены\n\n"
+        #     "Кому:\n"
+        #     + "\n".join(lines)
+        # )
+        emails = [EMAIL_TARGETS[k] for k in selected]
+
+        await call.message.answer(
+            "✅ Документы отправлены\n\n"
+            "Кому:\n"
+            + "\n".join(f"• {email}" for email in emails)
+        )
+
+        # ========================
+
         await state.clear()
         await call.answer()
         return
