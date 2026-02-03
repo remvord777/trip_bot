@@ -28,7 +28,7 @@ def advance_keyboard():
                     callback_data="advance_no",
                 ),
                 InlineKeyboardButton(
-                    text="💰 Авансовый запрос",
+                    text="💰 Аванс запрос",
                     callback_data="advance_yes",
                 ),
 
