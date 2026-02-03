@@ -196,7 +196,7 @@ async def advance_sum_entered(message: Message, state: FSMContext):
         data={
             "employee_name": data["employee_name"],
             "apply_date": datetime.now().strftime("%d.%m.%Y"),
-            "city": f"г. {data['city']}",
+            "city": f"{data['city']}",
             "object": data["object_name"],
             "contract": data["contract"],
             "date_from": data["date_from"],
