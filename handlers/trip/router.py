@@ -3,6 +3,8 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
+from aiogram.types import FSInputFile
+
 from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
 from keyboards.services import services_keyboard
@@ -137,25 +139,34 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
 # ================= CONFIRM =================
 
 @router.callback_query(TripStates.confirm, F.data == "confirm")
-async def confirm(call: CallbackQuery, state: FSMContext):
+async def confirm_trip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    render_docx(
+    # 1️⃣ Формируем DOCX
+    file_path = render_docx(
         template_name="service_task.docx",
-        data=data,
+        data={
+            "employee_name": data["employee_name"],
+            "position": data["position"],
+            "city": data["city"],
+            "object_name": data["object_name"],
+            "organization": data["organization"],
+            "contract": data["contract"],
+            "date_from": data["date_from"],
+            "date_to": data["date_to"],
+            "service": data["service"],
+            "signature": data.get("signature", ""),
+        },
     )
 
-    await call.message.answer("✅ Служебное задание сформировано")
-    await state.clear()
-    await call.answer()
+    # 2️⃣ Отправляем файл в Telegram
+    document = FSInputFile(file_path)
 
-
-@router.callback_query(TripStates.confirm, F.data == "edit")
-async def edit(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await call.message.answer(
-        "✏️ Начнём заново.\nВыберите город:",
-        reply_markup=locations_keyboard(),
+    await call.message.answer_document(
+        document=document,
+        caption="📄 Служебное задание сформировано",
     )
-    await state.set_state(TripStates.location)
+
+    # 3️⃣ Чистим состояние
+    await state.clear()
     await call.answer()

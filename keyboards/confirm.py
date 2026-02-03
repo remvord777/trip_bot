@@ -1,15 +1,20 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def confirm_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
-                KeyboardButton(text="✅ Подтвердить"),
-                KeyboardButton(text="✏️ Исправить"),
-            ]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
+                InlineKeyboardButton(
+                    text="✅ Подтвердить",
+                    callback_data="confirm",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✏️ Изменить",
+                    callback_data="edit",
+                )
+            ],
+        ]
     )
-

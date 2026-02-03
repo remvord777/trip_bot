@@ -1,18 +1,16 @@
-from docx import Document
 from pathlib import Path
+from docx import Document
 from datetime import datetime
 
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+OUT_DIR = BASE_DIR / "data" / "out"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def render_docx(template_name: str, data: dict) -> Path:
-    templates_dir = Path("templates")
-    out_dir = Path("data/out")
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    template_path = templates_dir / template_name
-    if not template_path.exists():
-        raise FileNotFoundError(f"Шаблон не найден: {template_path}")
-
+    template_path = TEMPLATES_DIR / template_name
     doc = Document(template_path)
 
     for p in doc.paragraphs:
@@ -22,11 +20,7 @@ def render_docx(template_name: str, data: dict) -> Path:
                 p.text = p.text.replace(placeholder, str(value))
 
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path = out_dir / f"service_task_{ts}.docx"
-
+    out_path = OUT_DIR / f"service_task_{ts}.docx"
     doc.save(out_path)
-
-    if not out_path.exists():
-        raise RuntimeError("DOCX файл не был создан")
 
     return out_path

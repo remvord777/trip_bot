@@ -1,46 +1,55 @@
 import asyncio
 import logging
 import os
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-
-from pathlib import Path
 from dotenv import load_dotenv
 
-from handlers import start, trip
+from handlers.start import router as start_router
+from handlers.trip.router import router as trip_router
 
-from pathlib import Path
-from dotenv import load_dotenv
+
+# ================== ENV ==================
 
 BASE_DIR = Path(__file__).resolve().parent
 
 ENV_FILE = os.getenv("ENV_FILE", ".env")
 load_dotenv(BASE_DIR / ENV_FILE)
-# ================== ENV ==================
-load_dotenv()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN not set")
+
 
 # ================== LOGGING ==================
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# ================== BOT ==================
-bot = Bot(token=BOT_TOKEN)
 
-# 🔥 ОБЯЗАТЕЛЬНО: FSM storage
+# ================== BOT ==================
+
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
+
 # ================== ROUTERS ==================
-dp.include_router(start.router)
-dp.include_router(trip.router)
+
+dp.include_router(start_router)
+dp.include_router(trip_router)
+
 
 # ================== MAIN ==================
+
 async def main():
+    logger.info("🚀 Starting polling")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

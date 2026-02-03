@@ -1,5 +1,5 @@
 EMPLOYEES = {
-    335400441: {  # ← ТВОЙ telegram_id (ЧИСЛО!)
+    335400441: {  # Воробьев
         "employee_name": "Воробьев Денис Сергеевич",
         "position": "Старший инженер",
         "email": "vorobev@intermatic.energy",
@@ -12,7 +12,9 @@ EMPLOYEES = {
             "e-mail: vorobev@intermatic.energy"
         ),
     },
-    "Колтыга Константин Сергеевич": {
+
+    1087265764: {  # Колтыга
+        "employee_name": "Колтыга Константин Сергеевич",
         "position": "Ведущий инженер",
         "email": "koltyga@intermatic.energy",
         "signature": (
