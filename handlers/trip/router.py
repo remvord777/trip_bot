@@ -1,14 +1,14 @@
 import logging
-from pathlib import Path
+from datetime import date
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.exceptions import TelegramBadRequest
 
 from keyboards.locations import locations_keyboard
-from keyboards.trip_calendar import current_calendar   # ✅ FIX
+from keyboards.trip_calendar import current_calendar, build_calendar
 from keyboards.purpose import purpose_keyboard
 from keyboards.email_targets import email_targets_keyboard
 from keyboards.confirm import confirm_keyboard
@@ -27,8 +27,8 @@ class TripStates(StatesGroup):
     location = State()
     date_from = State()
     date_to = State()
-    purpose = State()       # услуга
-    recipients = State()   # email
+    purpose = State()
+    recipients = State()
     confirm = State()
 
 
@@ -50,6 +50,9 @@ async def trip_start(message: Message, state: FSMContext):
 async def trip_location(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
 
+    today = date.today()
+    await state.update_data(cal_year=today.year, cal_month=today.month)
+
     await message.answer(
         "🟢 Дата начала командировки:",
         reply_markup=current_calendar(),
@@ -57,31 +60,62 @@ async def trip_location(message: Message, state: FSMContext):
     await state.set_state(TripStates.date_from)
 
 
-# ================== DATE FROM ==================
+# ================== CALENDAR NAV ==================
 
-@router.callback_query(TripStates.date_from)
-async def trip_date_from(call: CallbackQuery, state: FSMContext):
-    await state.update_data(date_from=call.data)
+@router.callback_query(F.data.in_(["prev_month", "next_month"]))
+async def calendar_nav(call: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    year = data["cal_year"]
+    month = data["cal_month"]
 
-    await call.message.answer(
-        "🔴 Дата окончания командировки:",
-        reply_markup=current_calendar(),
-    )
-    await state.set_state(TripStates.date_to)
+    if call.data == "prev_month":
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    else:
+        month += 1
+        if month == 13:
+            month = 1
+            year += 1
+
+    await state.update_data(cal_year=year, cal_month=month)
+
+    try:
+        await call.message.edit_reply_markup(
+            reply_markup=build_calendar(year, month)
+        )
+    except TelegramBadRequest:
+        pass
+
     await call.answer()
 
 
-# ================== DATE TO → PURPOSE ==================
+# ================== DATE SELECT ==================
 
-@router.callback_query(TripStates.date_to)
-async def trip_date_to(call: CallbackQuery, state: FSMContext):
-    await state.update_data(date_to=call.data)
+@router.callback_query(F.data.startswith("date:"))
+async def calendar_date_selected(call: CallbackQuery, state: FSMContext):
+    selected_date = call.data.split("date:")[1]
+    current_state = await state.get_state()
 
-    await call.message.answer(
-        "🛠 Выберите сервисную услугу:",
-        reply_markup=purpose_keyboard(),
-    )
-    await state.set_state(TripStates.purpose)
+    if current_state == TripStates.date_from:
+        await state.update_data(date_from=selected_date)
+
+        await call.message.edit_text(
+            "🔴 Дата окончания командировки:",
+            reply_markup=current_calendar(),
+        )
+        await state.set_state(TripStates.date_to)
+
+    elif current_state == TripStates.date_to:
+        await state.update_data(date_to=selected_date)
+
+        await call.message.edit_text(
+            "🛠 Выберите сервисную услугу:",
+            reply_markup=purpose_keyboard(),
+        )
+        await state.set_state(TripStates.purpose)
+
     await call.answer()
 
 
@@ -90,13 +124,12 @@ async def trip_date_to(call: CallbackQuery, state: FSMContext):
 @router.callback_query(TripStates.purpose)
 async def trip_purpose(call: CallbackQuery, state: FSMContext):
     await state.update_data(purpose=call.data)
+    await state.update_data(emails=[])
 
     await call.message.answer(
-        "🎯 Выберите получателей:",
+        "📧 Выберите получателей:",
         reply_markup=email_targets_keyboard(selected=[]),
     )
-
-    await state.update_data(emails=[])
     await state.set_state(TripStates.recipients)
     await call.answer()
 
@@ -115,7 +148,7 @@ async def trip_recipients(call: CallbackQuery, state: FSMContext):
             return
 
         preview = "\n".join(
-            f"• {a} <{EMAIL_TARGETS[a]}>"
+            f"• {EMAIL_TARGETS[a]}"
             for a in selected
         )
 
@@ -157,7 +190,7 @@ async def trip_recipients(call: CallbackQuery, state: FSMContext):
 async def trip_confirm(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    docx_file: Path = render_docx(
+    docx_file = render_docx(
         template_name="service_task.docx",
         data=data,
     )
@@ -173,4 +206,15 @@ async def trip_confirm(call: CallbackQuery, state: FSMContext):
 
     await call.message.answer("✅ Командировка оформлена")
     await state.clear()
+    await call.answer()
+
+
+@router.callback_query(TripStates.confirm, F.data == "edit")
+async def trip_edit(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer(
+        "✏️ Начнём заново.\nВыберите место командировки:",
+        reply_markup=locations_keyboard(),
+    )
+    await state.set_state(TripStates.location)
     await call.answer()
