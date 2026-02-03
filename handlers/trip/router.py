@@ -1,5 +1,6 @@
 import logging
 from datetime import date
+from pathlib import Path
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -10,12 +11,9 @@ from aiogram.exceptions import TelegramBadRequest
 from keyboards.locations import locations_keyboard
 from keyboards.trip_calendar import current_calendar, build_calendar
 from keyboards.purpose import purpose_keyboard
-from keyboards.email_targets import email_targets_keyboard
 from keyboards.confirm import confirm_keyboard
 
 from utils.docx_render import render_docx
-from utils.mailer import send_email
-from data.email_targets import EMAIL_TARGETS
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -28,7 +26,6 @@ class TripStates(StatesGroup):
     date_from = State()
     date_to = State()
     purpose = State()
-    recipients = State()
     confirm = State()
 
 
@@ -119,68 +116,50 @@ async def calendar_date_selected(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-# ================== PURPOSE ==================
+# ================== PURPOSE → SUMMARY + DOCX ==================
 
 @router.callback_query(TripStates.purpose)
 async def trip_purpose(call: CallbackQuery, state: FSMContext):
     await state.update_data(purpose=call.data)
-    await state.update_data(emails=[])
+    data = await state.get_data()
+
+    employee_name = data.get("name", "—")
+    position = data.get("position", "—")
+
+    # ===== формируем DOCX =====
+    docx_path: Path = render_docx(
+        template_name="service_task.docx",
+        data={
+            "employee_name": employee_name,
+            "position": position,
+            "city": data["city"],
+            "date_from": data["date_from"],
+            "date_to": data["date_to"],
+            "purpose": data["purpose"],
+        },
+    )
+
+    await state.update_data(docx_file=str(docx_path))
+
+    # ===== итог =====
+    text = (
+        "🔎 Проверь данные командировки:\n\n"
+        f"👤 Сотрудник: {employee_name}\n"
+        f"💼 Должность: {position}\n"
+        f"📍 Город: {data['city']}\n"
+        f"🟢 Начало: {data['date_from']}\n"
+        f"🔴 Окончание: {data['date_to']}\n"
+        f"🛠 Услуга: {data['purpose']}\n\n"
+        "📄 Служебное задание сформировано.\n"
+        "Подтвердить?"
+    )
 
     await call.message.answer(
-        "📧 Выберите получателей:",
-        reply_markup=email_targets_keyboard(selected=[]),
+        text,
+        reply_markup=confirm_keyboard(),
     )
-    await state.set_state(TripStates.recipients)
-    await call.answer()
 
-
-# ================== RECIPIENTS ==================
-
-@router.callback_query(TripStates.recipients)
-async def trip_recipients(call: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    selected = data.get("emails", [])
-    value = call.data
-
-    if value == "emails_done":
-        if not selected:
-            await call.answer("❗ Выберите получателя", show_alert=True)
-            return
-
-        preview = "\n".join(
-            f"• {EMAIL_TARGETS[a]}"
-            for a in selected
-        )
-
-        text = (
-            "🔎 Проверь данные:\n\n"
-            f"📍 Город: {data['city']}\n"
-            f"🟢 Начало: {data['date_from']}\n"
-            f"🔴 Окончание: {data['date_to']}\n"
-            f"🛠 Услуга: {data['purpose']}\n"
-            f"📧 Получатели:\n{preview}\n\n"
-            "Подтвердить?"
-        )
-
-        await call.message.answer(text, reply_markup=confirm_keyboard())
-        await state.set_state(TripStates.confirm)
-        await call.answer()
-        return
-
-    if value in selected:
-        selected.remove(value)
-    else:
-        selected.append(value)
-
-    await state.update_data(emails=selected)
-
-    try:
-        await call.message.edit_reply_markup(
-            reply_markup=email_targets_keyboard(selected=selected)
-        )
-    except TelegramBadRequest:
-        pass
-
+    await state.set_state(TripStates.confirm)
     await call.answer()
 
 
@@ -190,21 +169,12 @@ async def trip_recipients(call: CallbackQuery, state: FSMContext):
 async def trip_confirm(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    docx_file = render_docx(
-        template_name="service_task.docx",
-        data=data,
+    await call.message.answer(
+        "✅ Командировка подтверждена.\n"
+        f"📄 Файл готов:\n<code>{data['docx_file']}</code>",
+        parse_mode="HTML",
     )
 
-    to_emails = [EMAIL_TARGETS[a] for a in data["emails"]]
-
-    send_email(
-        to_emails=to_emails,
-        subject="Служебное задание",
-        body="Служебное задание во вложении.",
-        attachment=docx_file,
-    )
-
-    await call.message.answer("✅ Командировка оформлена")
     await state.clear()
     await call.answer()
 
