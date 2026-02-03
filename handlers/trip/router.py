@@ -95,22 +95,30 @@ async def calendar_date_selected(call: CallbackQuery, state: FSMContext):
     selected_date = call.data.split("date:")[1]
     current_state = await state.get_state()
 
+    # ===== ДАТА НАЧАЛА =====
     if current_state == TripStates.date_from:
         await state.update_data(date_from=selected_date)
 
-        await call.message.edit_text(
-            "🔴 Дата окончания командировки:",
+        await call.message.answer(
+            f"🟢 Дата начала выбрана: <b>{selected_date}</b>\n\n"
+            "🔴 Теперь выберите дату окончания:",
             reply_markup=current_calendar(),
+            parse_mode="HTML",
         )
+
         await state.set_state(TripStates.date_to)
 
+    # ===== ДАТА ОКОНЧАНИЯ =====
     elif current_state == TripStates.date_to:
         await state.update_data(date_to=selected_date)
 
-        await call.message.edit_text(
-            "🛠 Выберите сервисную услугу:",
+        await call.message.answer(
+            f"🔴 Дата окончания выбрана: <b>{selected_date}</b>\n\n"
+            "🛠 Теперь выберите сервисную услугу:",
             reply_markup=purpose_keyboard(),
+            parse_mode="HTML",
         )
+
         await state.set_state(TripStates.purpose)
 
     await call.answer()
