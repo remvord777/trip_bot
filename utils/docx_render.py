@@ -1,7 +1,6 @@
 from docx import Document
 from pathlib import Path
 from datetime import datetime
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -11,6 +10,12 @@ OUTPUT_DIR = BASE_DIR / "generated"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 
+FILE_TITLES = {
+    "service_task.docx": "служебное_задание",
+    "money_avans.docx": "заявление_командировка",
+}
+
+
 def render_docx(template_name: str, data: dict) -> Path:
     template_path = TEMPLATES_DIR / template_name
     doc = Document(template_path)
@@ -18,39 +23,42 @@ def render_docx(template_name: str, data: dict) -> Path:
     replacements = {
         "{{employee_name}}": data.get("employee_name", ""),
         "{{position}}": data.get("position", ""),
-        "{{city}}": f"г. {data.get('city', '')}",
+        "{{city}}": f"{data.get('settlement_prefix', '')} {data.get('city', '')}".strip(),
         "{{object}}": data.get("object_name", ""),
-        "{{organization}}": data.get("organization", ""),
         "{{contract}}": data.get("contract", ""),
         "{{date_from}}": data.get("date_from", ""),
         "{{date_to}}": data.get("date_to", ""),
         "{{total}}": str(data.get("total", "")),
         "{{purpose}}": data.get("service", ""),
         "{{advance_amount}}": str(data.get("advance_amount", "")),
-        "{{apply_date}}": data.get("apply_date", ""),
+        "{{apply_date}}": datetime.now().strftime("%d.%m.%Y"),
     }
 
-    # -------- paragraphs --------
+    # --- замена в параграфах ---
     for paragraph in doc.paragraphs:
         for key, value in replacements.items():
             if key in paragraph.text:
                 paragraph.text = paragraph.text.replace(key, value)
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # -------- tables --------
+    # --- замена в таблицах ---
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for key, value in replacements.items():
                     if key in cell.text:
                         cell.text = cell.text.replace(key, value)
-                        for p in cell.paragraphs:
-                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # ===== ИМЯ ФАЙЛА =====
+
+    doc_type = FILE_TITLES.get(template_name, "документ")
+    surname = data.get("employee_name", "").split()[0]
+    date_from = data.get("date_from", "")
+    date_to = data.get("date_to", "")
 
     filename = (
-        f"{template_name.replace('.docx', '')}_"
-        f"{datetime.now():%Y-%m-%d_%H-%M-%S}.docx"
+        f"ИМ_{doc_type}_{surname}_{date_from}–{date_to}.docx"
     )
+
     output_path = OUTPUT_DIR / filename
     doc.save(output_path)
 
