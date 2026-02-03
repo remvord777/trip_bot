@@ -1,26 +1,64 @@
-from pathlib import Path
 from docx import Document
+from docx.shared import Pt
+from docx.oxml.ns import qn
+from pathlib import Path
 from datetime import datetime
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-TEMPLATES_DIR = BASE_DIR / "templates"
-OUT_DIR = BASE_DIR / "data" / "out"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+FONT_NAME = "Times New Roman"
+FONT_SIZE = 9
+
+
+def apply_font(run):
+    run.font.name = FONT_NAME
+    run.font.size = Pt(FONT_SIZE)
+
+    # важно для Word (иначе может остаться Calibri)
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), FONT_NAME)
+
+
+def replace_in_paragraph(paragraph, data: dict):
+    full_text = "".join(run.text for run in paragraph.runs)
+
+    replaced = False
+    for key, value in data.items():
+        placeholder = f"{{{{{key}}}}}"
+        if placeholder in full_text:
+            full_text = full_text.replace(placeholder, str(value))
+            replaced = True
+
+    if replaced:
+        paragraph.clear()
+        run = paragraph.add_run(full_text)
+        apply_font(run)
+
+
+def replace_in_table(table, data: dict):
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                replace_in_paragraph(paragraph, data)
 
 
 def render_docx(template_name: str, data: dict) -> Path:
-    template_path = TEMPLATES_DIR / template_name
+    base_dir = Path(__file__).resolve().parents[1]
+    template_path = base_dir / "templates" / template_name
+
+    out_dir = base_dir / "data" / "out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    out_file = out_dir / f"service_task_{timestamp}.docx"
+
     doc = Document(template_path)
 
-    for p in doc.paragraphs:
-        for key, value in data.items():
-            placeholder = f"{{{{{key}}}}}"
-            if placeholder in p.text:
-                p.text = p.text.replace(placeholder, str(value))
+    # обычный текст
+    for paragraph in doc.paragraphs:
+        replace_in_paragraph(paragraph, data)
 
-    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_path = OUT_DIR / f"service_task_{ts}.docx"
-    doc.save(out_path)
+    # таблицы
+    for table in doc.tables:
+        replace_in_table(table, data)
 
-    return out_path
+    doc.save(out_file)
+    return out_file
