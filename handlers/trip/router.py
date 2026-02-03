@@ -93,10 +93,20 @@ async def date_from(call: CallbackQuery, state: FSMContext):
 
 
 # ================= DATE TO =================
-
 @router.callback_query(TripStates.date_to, F.data.startswith("date:"))
 async def date_to(call: CallbackQuery, state: FSMContext):
-    await state.update_data(date_to=call.data.replace("date:", ""))
+    date_to_str = call.data.replace("date:", "")
+    data = await state.get_data()
+
+    date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
+    date_to = datetime.strptime(date_to_str, "%d.%m.%Y")
+
+    total_days = (date_to - date_from).days + 1
+
+    await state.update_data(
+        date_to=date_to_str,
+        total=str(total_days),
+    )
 
     await call.message.answer(
         "🛠 Выберите вид сервисных работ:",
@@ -232,7 +242,12 @@ async def email_select(call: CallbackQuery, state: FSMContext):
             await call.answer("Выберите получателя", show_alert=True)
             return
 
-        recipients = [EMAIL_TARGETS[k] for k in selected]
+        recipients = []
+        for key in selected:
+            if key == "me":
+                recipients.append(data["email"])
+            else:
+                recipients.append(EMAIL_TARGETS[key])
 
         send_email(
             to_emails=recipients,
@@ -241,26 +256,11 @@ async def email_select(call: CallbackQuery, state: FSMContext):
             attachments=data["files"],
         )
 
-        # ===== ВОТ ЭТА ЧАСТЬ =====
-        # lines = []
-        # for key in selected:
-        #     email = EMAIL_TARGETS.get(key, "—")
-        #     lines.append(f"• {key} — {email}")
-        #
-        # await call.message.answer(
-        #     "✅ Документы отправлены\n\n"
-        #     "Кому:\n"
-        #     + "\n".join(lines)
-        # )
-        emails = [EMAIL_TARGETS[k] for k in selected]
-
         await call.message.answer(
             "✅ Документы отправлены\n\n"
             "Кому:\n"
-            + "\n".join(f"• {email}" for email in emails)
+            + "\n".join(f"• {email}" for email in recipients)
         )
-
-        # ========================
 
         await state.clear()
         await call.answer()

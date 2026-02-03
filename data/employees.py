@@ -25,4 +25,13 @@ EMPLOYEES = {
             "e-mail: koltyga@intermatic.energy"
         ),
     },
+    7197179581: {  # ТЕСТОВЫЙ ПОЛЬЗОВАТЕЛЬ
+        "employee_name": "Вальфрамов Моисей Иссаакович",
+        "position": "Просто гений",
+        "email": "rem-denv@yandex.ru",
+        "signature": (
+            "--\n"
+            "здраствуйте - я ваша тетя"
+        ),
+    },
 }

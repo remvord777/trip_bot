@@ -16,6 +16,29 @@ FILE_TITLES = {
 }
 
 
+def _replace_in_paragraph(paragraph, replacements: dict):
+    full_text = paragraph.text
+    replaced = False
+
+    for key, value in replacements.items():
+        if key in full_text:
+            full_text = full_text.replace(key, value)
+            replaced = True
+
+    if not replaced:
+        return
+
+    # сохраняем стиль первого run
+    first_run = paragraph.runs[0]
+
+    # очищаем все runs
+    for run in paragraph.runs:
+        run.text = ""
+
+    # записываем текст в первый run
+    first_run.text = full_text
+
+
 def render_docx(template_name: str, data: dict) -> Path:
     template_path = TEMPLATES_DIR / template_name
     doc = Document(template_path)
@@ -34,30 +57,24 @@ def render_docx(template_name: str, data: dict) -> Path:
         "{{apply_date}}": datetime.now().strftime("%d.%m.%Y"),
     }
 
-    # --- замена в параграфах ---
+    # ===== ПАРАГРАФЫ =====
     for paragraph in doc.paragraphs:
-        for key, value in replacements.items():
-            if key in paragraph.text:
-                paragraph.text = paragraph.text.replace(key, value)
+        _replace_in_paragraph(paragraph, replacements)
 
-    # --- замена в таблицах ---
+    # ===== ТАБЛИЦЫ =====
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for key, value in replacements.items():
-                    if key in cell.text:
-                        cell.text = cell.text.replace(key, value)
+                for paragraph in cell.paragraphs:
+                    _replace_in_paragraph(paragraph, replacements)
 
     # ===== ИМЯ ФАЙЛА =====
-
     doc_type = FILE_TITLES.get(template_name, "документ")
     surname = data.get("employee_name", "").split()[0]
     date_from = data.get("date_from", "")
     date_to = data.get("date_to", "")
 
-    filename = (
-        f"ИМ_{doc_type}_{surname}_{date_from}–{date_to}.docx"
-    )
+    filename = f"ИМ_{doc_type}_{surname}_{date_from}–{date_to}.docx"
 
     output_path = OUTPUT_DIR / filename
     doc.save(output_path)
