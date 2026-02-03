@@ -1,64 +1,47 @@
 from docx import Document
-from docx.shared import Pt
-from docx.oxml.ns import qn
 from pathlib import Path
 from datetime import datetime
 
 
-FONT_NAME = "Times New Roman"
-FONT_SIZE = 9
+BASE_DIR = Path(__file__).resolve().parents[1]
+TEMPLATES_DIR = BASE_DIR / "templates"
+OUTPUT_DIR = BASE_DIR / "generated"
 
-
-def apply_font(run):
-    run.font.name = FONT_NAME
-    run.font.size = Pt(FONT_SIZE)
-
-    # важно для Word (иначе может остаться Calibri)
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), FONT_NAME)
-
-
-def replace_in_paragraph(paragraph, data: dict):
-    full_text = "".join(run.text for run in paragraph.runs)
-
-    replaced = False
-    for key, value in data.items():
-        placeholder = f"{{{{{key}}}}}"
-        if placeholder in full_text:
-            full_text = full_text.replace(placeholder, str(value))
-            replaced = True
-
-    if replaced:
-        paragraph.clear()
-        run = paragraph.add_run(full_text)
-        apply_font(run)
-
-
-def replace_in_table(table, data: dict):
-    for row in table.rows:
-        for cell in row.cells:
-            for paragraph in cell.paragraphs:
-                replace_in_paragraph(paragraph, data)
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 def render_docx(template_name: str, data: dict) -> Path:
-    base_dir = Path(__file__).resolve().parents[1]
-    template_path = base_dir / "templates" / template_name
-
-    out_dir = base_dir / "data" / "out"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out_file = out_dir / f"service_task_{timestamp}.docx"
-
+    template_path = TEMPLATES_DIR / template_name
     doc = Document(template_path)
 
-    # обычный текст
+    replacements = {
+        "{{employee_name}}": data.get("employee_name", ""),
+        "{{position}}": data.get("position", ""),
+        "{{city}}": f"г. {data.get('city', '')}",
+        "{{object}}": data.get("object_name", ""),
+        "{{contract}}": data.get("contract", ""),
+        "{{date_from}}": data.get("date_from", ""),
+        "{{date_to}}": data.get("date_to", ""),
+        "{{total}}": str(data.get("total", "")),
+        "{{purpose}}": data.get("service", ""),
+        "{{advance_amount}}": str(data.get("advance_amount", "")),
+        "{{apply_date}}": datetime.now().strftime("%d.%m.%Y"),
+    }
+
     for paragraph in doc.paragraphs:
-        replace_in_paragraph(paragraph, data)
+        for key, value in replacements.items():
+            if key in paragraph.text:
+                paragraph.text = paragraph.text.replace(key, value)
 
-    # таблицы
     for table in doc.tables:
-        replace_in_table(table, data)
+        for row in table.rows:
+            for cell in row.cells:
+                for key, value in replacements.items():
+                    if key in cell.text:
+                        cell.text = cell.text.replace(key, value)
 
-    doc.save(out_file)
-    return out_file
+    filename = f"{template_name.replace('.docx', '')}_{datetime.now():%Y-%m-%d_%H-%M-%S}.docx"
+    output_path = OUTPUT_DIR / filename
+    doc.save(output_path)
+
+    return output_path
