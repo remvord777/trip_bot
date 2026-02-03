@@ -1,8 +1,8 @@
-from datetime import datetime
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from datetime import datetime
 
 from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
@@ -25,7 +25,6 @@ class TripStates(StatesGroup):
     date_to = State()
     service = State()
     confirm = State()
-    ask_advance = State()
     advance_sum = State()
 
 
@@ -33,11 +32,7 @@ class TripStates(StatesGroup):
 
 @router.message(F.text == "🧳 Командировка")
 async def trip_start(message: Message, state: FSMContext):
-    data = await state.get_data()
-
-    # данные сотрудника уже положены в /start
-    await state.set_data(data)
-
+    # В state УЖЕ лежат employee_name / position / email (из /start)
     await message.answer(
         "📍 Выберите город командировки:",
         reply_markup=locations_keyboard(),
@@ -57,9 +52,10 @@ async def trip_location(message: Message, state: FSMContext):
 
     await state.update_data(
         city=city,
-        object_name=object_key,
-        organization=obj["organization"],
-        contract=obj["contract"],
+        settlement_prefix=location.get("settlement_prefix", ""),
+        object_name=obj.get("name", object_key),
+        organization=obj.get("organization", ""),
+        contract=obj.get("contract", ""),
     )
 
     await message.answer(
@@ -107,20 +103,19 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
     service_title = SERVICES[service_key]
 
     await state.update_data(service=service_title)
-
     data = await state.get_data()
 
     text = (
         "🔎 Проверь данные командировки:\n\n"
         f"👤 {data['employee_name']}\n"
         f"💼 {data['position']}\n\n"
-        f"📍 г. {data['city']}\n"
+        f"📍 {data['settlement_prefix']} {data['city']}\n"
         f"🏭 {data['object_name']}\n"
         f"🏢 {data['organization']}\n"
         f"📄 Договор №{data['contract']}\n\n"
         f"🟢 С {data['date_from']}\n"
         f"🔴 По {data['date_to']}\n\n"
-        f"{data['service']}"
+        f"🛠 {data['service']}"
     )
 
     await call.message.answer(text, reply_markup=confirm_keyboard())
@@ -134,74 +129,56 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
 async def confirm_trip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    # --- первый документ ---
     file_path = render_docx(
         template_name="service_task.docx",
         data={
-            "employee_name": data["employee_name"],
-            "position": data["position"],
-            "city": data["city"],
-            "object": data["object_name"],
-            "organization": data["organization"],
-            "contract": data["contract"],
-            "date_from": data["date_from"],
-            "date_to": data["date_to"],
-            "purpose": data["service"],
-            "signature": data.get("signature", ""),
+            **data,
+            "apply_date": datetime.now().strftime("%d.%m.%Y"),
         },
     )
 
     await call.message.answer_document(
         FSInputFile(file_path),
         caption="📄 Служебное задание сформировано",
-    )
-
-    # --- спрашиваем про аванс ---
-    await call.message.answer(
-        "Сформировать авансовый запрос?",
         reply_markup=advance_keyboard(),
     )
-    await state.set_state(TripStates.ask_advance)
     await call.answer()
 
 
-# ================= ADVANCE YES =================
+# ================= ADVANCE =================
 
-@router.callback_query(TripStates.ask_advance, F.data == "advance_yes")
-async def ask_advance_sum(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("Введите сумму аванса:")
+# ================= ADVANCE =================
+
+@router.callback_query(F.data == "advance_yes")
+async def advance_start(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("💰 Введите сумму аванса:")
     await state.set_state(TripStates.advance_sum)
     await call.answer()
 
 
-# ================= ADVANCE NO =================
-
-@router.callback_query(TripStates.ask_advance, F.data == "advance_no")
-async def skip_advance(call: CallbackQuery, state: FSMContext):
-    await call.message.answer("Готово 👍")
+@router.callback_query(F.data == "advance_no")
+async def advance_cancel(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("✅ Командировка оформлена без аванса")
     await state.clear()
     await call.answer()
 
 
-# ================= ADVANCE SUM =================
-
 @router.message(TripStates.advance_sum)
 async def advance_sum_entered(message: Message, state: FSMContext):
     amount = message.text.strip()
+
+    if not amount.isdigit():
+        await message.answer("❗ Введите сумму цифрами")
+        return
+
+    await state.update_data(advance_amount=amount)
     data = await state.get_data()
 
-    # --- второй документ ---
     file_path = render_docx(
         template_name="money_avans.docx",
         data={
-            "employee_name": data["employee_name"],
+            **data,
             "apply_date": datetime.now().strftime("%d.%m.%Y"),
-            "city": f"{data['city']}",
-            "object": data["object_name"],
-            "contract": data["contract"],
-            "date_from": data["date_from"],
-            "date_to": data["date_to"],
-            "advance_amount": amount,
         },
     )
 

@@ -2,7 +2,6 @@ from docx import Document
 from pathlib import Path
 from datetime import datetime
 
-
 BASE_DIR = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = BASE_DIR / "templates"
 OUTPUT_DIR = BASE_DIR / "generated"
@@ -17,15 +16,16 @@ def render_docx(template_name: str, data: dict) -> Path:
     replacements = {
         "{{employee_name}}": data.get("employee_name", ""),
         "{{position}}": data.get("position", ""),
-        "{{city}}": f"г. {data.get('city', '')}",
+        "{{city}}": f"{data.get('settlement_prefix', '')} {data.get('city', '')}",
         "{{object}}": data.get("object_name", ""),
+        "{{organization}}": data.get("organization", ""),
         "{{contract}}": data.get("contract", ""),
         "{{date_from}}": data.get("date_from", ""),
         "{{date_to}}": data.get("date_to", ""),
         "{{total}}": str(data.get("total", "")),
         "{{purpose}}": data.get("service", ""),
         "{{advance_amount}}": str(data.get("advance_amount", "")),
-        "{{apply_date}}": datetime.now().strftime("%d.%m.%Y"),
+        "{{apply_date}}": data.get("apply_date", ""),
     }
 
     for paragraph in doc.paragraphs:

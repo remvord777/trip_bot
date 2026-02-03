@@ -6,13 +6,14 @@ def confirm_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ Подтвердить",
-                    callback_data="confirm",
-                ),
-                InlineKeyboardButton(
                     text="✏️ Изменить",
                     callback_data="edit",
                 ),
+                InlineKeyboardButton(
+                    text="✅ Подтвердить",
+                    callback_data="confirm",
+                ),
+
             ]
         ]
     )
@@ -23,13 +24,14 @@ def advance_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="💰 Сформировать авансовый запрос",
-                    callback_data="advance_yes",
-                ),
-                InlineKeyboardButton(
                     text="❌ Нет",
                     callback_data="advance_no",
                 ),
+                InlineKeyboardButton(
+                    text="💰 Авансовый запрос",
+                    callback_data="advance_yes",
+                ),
+
             ]
         ]
     )
