@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -9,6 +7,7 @@ from keyboards.locations import locations_keyboard
 from keyboards.calendar import current_calendar
 from keyboards.services import services_keyboard
 from keyboards.confirm import confirm_keyboard
+from keyboards.advance import advance_offer_keyboard
 
 from data.locations import LOCATIONS
 from data.services import SERVICES
@@ -26,6 +25,46 @@ class TripStates(StatesGroup):
     date_to = State()
     service = State()
     confirm = State()
+    advance_offer = State()
+    advance_amount = State()  # 👈 НОВОЕ
+
+@router.callback_query(TripStates.advance_offer, F.data == "advance:yes")
+async def advance_yes(call: CallbackQuery, state: FSMContext):
+    await call.message.answer(
+        "💰 Введите сумму аванса (в рублях):\n"
+        "Например: 45000"
+    )
+    await state.set_state(TripStates.advance_amount)
+    await call.answer()
+@router.message(TripStates.advance_amount)
+async def advance_amount(message: Message, state: FSMContext):
+    text = message.text.replace(" ", "")
+
+    if not text.isdigit():
+        await message.answer("❌ Введите сумму **числом**, без букв.")
+        return
+
+    amount = int(text)
+
+    await state.update_data(advance_amount=amount)
+
+    data = await state.get_data()
+
+    await message.answer(
+        "✅ Авансовый запрос принят:\n\n"
+        f"👤 {data['employee_name']}\n"
+        f"💼 {data['position']}\n"
+        f"📍 {data['city']}\n"
+        f"🏭 {data['object_name']}\n"
+        f"💰 Сумма аванса: {amount:,} ₽".replace(",", " ")
+    )
+
+    # дальше можно:
+    # 1) сформировать DOCX
+    # 2) спросить комментарий
+    # 3) отправить письмо
+
+    await state.clear()
 
 
 # ================= START =================
@@ -34,7 +73,6 @@ class TripStates(StatesGroup):
 async def trip_start(message: Message, state: FSMContext):
     data = await state.get_data()
 
-    # ⚠️ ВАЖНО: сохраняем данные сотрудника, которые положил /start
     await state.set_data({
         "employee_name": data.get("employee_name"),
         "position": data.get("position"),
@@ -56,12 +94,11 @@ async def trip_location(message: Message, state: FSMContext):
     city = message.text
     location = LOCATIONS[city]
 
-    # берём первый объект из справочника
     object_key = next(iter(location["objects"]))
     obj = location["objects"][object_key]
 
     await state.update_data(
-        city=f"г. {city}",        # ← ВОТ ЗДЕСЬ
+        city=f"г. {city}",
         object_name=object_key,
         organization=obj["organization"],
         contract=obj["contract"],
@@ -78,8 +115,8 @@ async def trip_location(message: Message, state: FSMContext):
 
 @router.callback_query(TripStates.date_from, F.data.startswith("date:"))
 async def date_from(call: CallbackQuery, state: FSMContext):
-    date_str = call.data.replace("date:", "")
-    await state.update_data(date_from=date_str)
+    date = call.data.replace("date:", "")
+    await state.update_data(date_from=date)
 
     await call.message.answer(
         "🔴 Дата окончания командировки:",
@@ -93,11 +130,11 @@ async def date_from(call: CallbackQuery, state: FSMContext):
 
 @router.callback_query(TripStates.date_to, F.data.startswith("date:"))
 async def date_to(call: CallbackQuery, state: FSMContext):
-    date_str = call.data.replace("date:", "")
-    await state.update_data(date_to=date_str)
+    date = call.data.replace("date:", "")
+    await state.update_data(date_to=date)
 
     await call.message.answer(
-        "🛠 Выберите вид сервисных работ:",
+        "Выберите вид работ:",
         reply_markup=services_keyboard(),
     )
     await state.set_state(TripStates.service)
@@ -109,35 +146,23 @@ async def date_to(call: CallbackQuery, state: FSMContext):
 @router.callback_query(TripStates.service, F.data.startswith("service:"))
 async def service_selected(call: CallbackQuery, state: FSMContext):
     service_key = call.data.replace("service:", "")
-    service_title = SERVICES.get(service_key)
-
-    if not service_title:
-        await call.answer("Неизвестный вид работ", show_alert=True)
-        return
+    service_title = SERVICES[service_key]
 
     await state.update_data(service=service_title)
 
     data = await state.get_data()
 
-    # ===== считаем общее количество дней =====
-    date_from = datetime.strptime(data["date_from"], "%d.%m.%Y")
-    date_to = datetime.strptime(data["date_to"], "%d.%m.%Y")
-    total_days = (date_to - date_from).days + 1
-
-    await state.update_data(total=total_days)
-
     text = (
         "🔎 Проверь данные командировки:\n\n"
-        f"👤 {data.get('employee_name', '')}\n"
-        f"💼 {data.get('position', '')}\n\n"
-        f"📍 {data.get('city', '')}\n"
-        f"🏭 {data.get('object_name', '')}\n"
-        f"🏢 {data.get('organization', '')}\n"
-        f"📄 Договор №{data.get('contract', '')}\n\n"
-        f"🟢 С {data.get('date_from', '')}\n"
-        f"🔴 По {data.get('date_to', '')}\n"
-        f"📆 Дней: {total_days}\n\n"
-        f"🛠 {service_title}"
+        f"👤 {data['employee_name']}\n"
+        f"💼 {data['position']}\n\n"
+        f"📍 {data['city']}\n"
+        f"🏭 {data['object_name']}\n"
+        f"🏢 {data['organization']}\n"
+        f"📄 Договор №{data['contract']}\n\n"
+        f"🟢 С {data['date_from']}\n"
+        f"🔴 По {data['date_to']}\n\n"
+        f"{data['service']}"
     )
 
     await call.message.answer(text, reply_markup=confirm_keyboard())
@@ -151,30 +176,51 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
 async def confirm_trip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
-    # ===== формируем DOCX =====
     file_path = render_docx(
         template_name="service_task.docx",
         data={
-            "employee_name": data.get("employee_name", ""),
-            "position": data.get("position", ""),
-            "city": data.get("city", ""),
-            "object": data.get("object_name", ""),  # ← ВАЖНО
-            "contract": data.get("contract", ""),
-            "date_from": data.get("date_from", ""),
-            "date_to": data.get("date_to", ""),
-            "total": data.get("total", ""),
-            "purpose": data.get("service", ""),  # ← ВАЖНО
+            "employee_name": data["employee_name"],
+            "position": data["position"],
+            "city": data["city"],
+            "object": data["object_name"],
+            "organization": data["organization"],
+            "contract": data["contract"],
+            "date_from": data["date_from"],
+            "date_to": data["date_to"],
+            "service": data["service"],
+            "purpose": data["service"],
             "signature": data.get("signature", ""),
         },
     )
 
-    # ===== отправляем файл пользователю =====
-    document = FSInputFile(file_path)
-
     await call.message.answer_document(
-        document=document,
+        document=FSInputFile(file_path),
         caption="📄 Служебное задание сформировано",
     )
 
+    await call.message.answer(
+        "Сформировать авансовый запрос?",
+        reply_markup=advance_offer_keyboard(),
+    )
+
+    await state.set_state(TripStates.advance_offer)
+    await call.answer()
+
+
+# ================= ADVANCE OFFER =================
+
+@router.callback_query(TripStates.advance_offer, F.data == "advance:no")
+async def advance_no(call: CallbackQuery, state: FSMContext):
+    await call.message.answer("Хорошо, можно сформировать позже 👍")
+    await state.clear()
+    await call.answer()
+
+
+@router.callback_query(TripStates.advance_offer, F.data == "advance:yes")
+async def advance_yes(call: CallbackQuery, state: FSMContext):
+    await call.message.answer(
+        "Ок 👍\n"
+        "Следующим шагом сформируем авансовый запрос."
+    )
     await state.clear()
     await call.answer()
