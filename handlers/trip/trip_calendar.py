@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from handlers.trip.states import TripStates
-from keyboards.calendar import build_calendar, current_calendar
+from keyboards.trip_calendar import build_calendar, current_calendar
 from keyboards.main import purpose_keyboard
 
 router = Router()

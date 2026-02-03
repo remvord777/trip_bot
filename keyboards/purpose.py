@@ -1,10 +1,11 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 
 def purpose_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Служебная")],
-            [KeyboardButton(text="Учебная")],
-        ],
-        resize_keyboard=True,
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="ПНР", callback_data="ПНР")],
+            [InlineKeyboardButton(text="ТО", callback_data="ТО")],
+            [InlineKeyboardButton(text="Диагностика", callback_data="Диагностика")],
+        ]
     )

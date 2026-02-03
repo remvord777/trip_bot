@@ -1,7 +1,10 @@
 import os
 import smtplib
+import logging
 from email.message import EmailMessage
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def send_email(
@@ -10,34 +13,41 @@ def send_email(
     body: str,
     attachment: Path,
 ):
-    if not to_emails:
-        raise RuntimeError("Список получателей пуст — письмо не отправлено")
+    logger.error("SMTP SEND START")
+    logger.error("TO: %r", to_emails)
 
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
 
-    if not all([smtp_host, smtp_user, smtp_pass]):
-        raise RuntimeError("SMTP параметры не заданы в .env")
+    logger.error("SMTP HOST=%s PORT=%s USER=%s", smtp_host, smtp_port, smtp_user)
 
-    msg = EmailMessage()
-    msg["From"] = smtp_user
-    msg["To"] = ", ".join(to_emails)
-    msg["Subject"] = subject
-    msg.set_content(body)
+    try:
+        msg = EmailMessage()
+        msg["From"] = smtp_user
+        msg["To"] = ", ".join(to_emails)
+        msg["Subject"] = subject
+        msg.set_content(body)
 
-    with open(attachment, "rb") as f:
-        msg.add_attachment(
-            f.read(),
-            maintype="application",
-            subtype="octet-stream",
-            filename=attachment.name,
-        )
+        with open(attachment, "rb") as f:
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="octet-stream",
+                filename=attachment.name,
+            )
 
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            server.set_debuglevel(1)  # 🔥 ПЕЧАТАЕТ ВСЮ SMTP СЕССИЮ
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+
+        logger.error("SMTP SEND OK")
+
+    except Exception as e:
+        logger.exception("SMTP SEND FAILED")
+        raise

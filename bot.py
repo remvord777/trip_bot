@@ -4,6 +4,8 @@ import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+
+from pathlib import Path
 from dotenv import load_dotenv
 
 from handlers import start, trip
@@ -12,7 +14,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+
+ENV_FILE = os.getenv("ENV_FILE", ".env")
+load_dotenv(BASE_DIR / ENV_FILE)
 # ================== ENV ==================
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
