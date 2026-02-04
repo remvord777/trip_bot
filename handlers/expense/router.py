@@ -1,4 +1,6 @@
 # handlers/expense/router.py
+from keyboards.email_targets import email_targets_keyboard
+
 import logging
 from datetime import datetime
 
@@ -316,7 +318,12 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
         caption="📄 Авансовый отчёт сформирован"
     )
 
-    await state.clear()
+    await call.message.answer(
+        "📤 Куда отправить авансовый отчёт?",
+        reply_markup=email_targets_keyboard([])  # ← ТОЧНО КАК РАНЬШЕ
+    )
+
+    # ❗ ВАЖНО: state.clear() ЗДЕСЬ НЕ ДЕЛАЕМ
     await call.answer()
 
 
