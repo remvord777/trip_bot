@@ -177,7 +177,6 @@ async def service_selected(call: CallbackQuery, state: FSMContext):
 
 
 # ================= CONFIRM =================
-
 @router.callback_query(TripStates.confirm, F.data == "confirm")
 async def confirm_trip(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -186,6 +185,7 @@ async def confirm_trip(call: CallbackQuery, state: FSMContext):
         template_name="service_task.docx",
         data={
             **data,
+            "purpose": data.get("service", ""),
             "apply_date": datetime.now().strftime("%d.%m.%Y"),
         },
     ))
@@ -333,7 +333,7 @@ async def email_select(call: CallbackQuery, state: FSMContext):
             "total": data.get("total"),
 
             # ===== назначение =====
-            "service": data.get("service"),
+            "service": data.get("service", ""),
 
             # ===== аванс / отчет =====
             "advance_amount": data.get("advance_amount", ""),

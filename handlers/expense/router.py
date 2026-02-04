@@ -17,9 +17,9 @@ from aiogram.fsm.context import FSMContext
 from handlers.expense.states import ExpenseStates
 from keyboards.email_targets import email_targets_keyboard
 from data.email_targets import EMAIL_TARGETS
+from keyboards.main import main_menu
 
 from data.trips_store import load_trips
-from data.advances_store import add_advance
 from data.employees import EMPLOYEES
 from utils.docx_render import render_docx
 from utils.mailer import send_email
@@ -102,7 +102,7 @@ async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
         f"📍 {trip['object_name']}\n"
         f"📅 {trip['date_from']} – {trip['date_to']}\n"
         f"🧮 Дней: {days}\n\n"
-        f"💰 Суточные: {days} × {PER_DIEM_RATE} ₽ = "
+        f"💰 Суточные: {PER_DIEM_RATE} × {days} ₽ = "
         f"<b>{per_diem_total:,} ₽</b>\n\n"
         "🏨 Введите сумму проживания (₽).\n"
         "Если проживания не было — введите 0.",
@@ -117,24 +117,6 @@ async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
 # ACCOMMODATION
 # ======================================================
 
-@router.callback_query(
-    ExpenseStates.select_accommodation,
-    F.data.startswith("acc:")
-)
-async def accommodation_selected(call: CallbackQuery, state: FSMContext):
-    acc_type = call.data.split(":")[1]
-
-    if acc_type == "none":
-        await state.update_data(accommodation_amount=0)
-        await call.message.answer("🚕 Введите сумму такси (₽):")
-        await state.set_state(ExpenseStates.input_taxi_amount)
-    else:
-        await call.message.answer("🏨 Введите сумму проживания (₽):")
-        await state.set_state(ExpenseStates.input_accommodation_amount)
-
-    await call.answer()
-
-
 @router.message(
     ExpenseStates.input_accommodation_amount,
     F.text.regexp(r"^\d+$")
@@ -148,38 +130,23 @@ async def accommodation_amount(message: Message, state: FSMContext):
 # ======================================================
 # TAXI
 # ======================================================
+
 @router.message(
     ExpenseStates.input_taxi_amount,
     F.text.regexp(r"^\d+$")
 )
 async def taxi_amount(message: Message, state: FSMContext):
     await state.update_data(taxi_amount=int(message.text))
-
     await message.answer(
         "✈️🚆 Введите сумму билетов (₽).\n"
         "Если билетов не было — введите 0."
     )
     await state.set_state(ExpenseStates.input_ticket_amount)
+
+
 # ======================================================
 # TICKETS
 # ======================================================
-
-@router.callback_query(
-    ExpenseStates.select_ticket_type,
-    F.data.startswith("ticket:")
-)
-async def ticket_type_selected(call: CallbackQuery, state: FSMContext):
-    ticket_type = call.data.split(":")[1]
-
-    if ticket_type == "none":
-        await state.update_data(ticket_amount=0)
-        await show_confirm(call, state)
-    else:
-        await call.message.answer("Введите сумму билетов (₽):")
-        await state.set_state(ExpenseStates.input_ticket_amount)
-
-    await call.answer()
-
 
 @router.message(
     ExpenseStates.input_ticket_amount,
@@ -241,21 +208,32 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
     employee = EMPLOYEES.get(telegram_id, {})
 
     docx_data = {
+        # сотрудник
         "employee_name": employee.get("employee_name", ""),
         "employee_short": employee.get("employee_short", ""),
         "position": employee.get("position", ""),
         "department": trip.get("department", ""),
+
+        # объект / договор
         "object_name": trip.get("object_name", ""),
         "contract": trip.get("contract", ""),
         "organization": trip.get("organization", ""),
         "purpose": trip.get("service", ""),
+
+        # даты
         "date_from": trip.get("date_from", "")[:5],
         "date_to": trip.get("date_to", "")[:5],
         "report_date": datetime.now().strftime("%d.%m.%Y"),
+
+        # суточные
+        "per_diem_rate": str(data.get("per_diem_rate", 0)),
+        "total": str(data.get("days", 0)),
+        "per_diem_total": str(data.get("per_diem_total", 0)),
+
+        # расходы
         "accommodation_amount": str(data.get("accommodation_amount", 0)),
         "taxi_amount": str(data.get("taxi_amount", 0)),
         "ticket_amount": str(data.get("ticket_amount", 0)),
-        "per_diem_total": str(data.get("per_diem_total", 0)),
         "total_amount": str(data.get("total_amount", 0)),
     }
 
@@ -285,63 +263,68 @@ async def advance_email_select(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     selected = data.get("email_targets", [])
 
-    # ================= SEND =================
     if action == "send":
         if not selected:
             await call.answer("Выберите получателя", show_alert=True)
             return
 
-        recipients = []
         employee = EMPLOYEES.get(call.from_user.id, {})
+        trip = data["trip"]
 
+        recipients = []
         for key in selected:
             if key == "me":
-                email = employee.get("email")
-                if email:
-                    recipients.append(email)
+                if employee.get("email"):
+                    recipients.append(employee["email"])
             else:
-                email = EMAIL_TARGETS.get(key)
-                if email:
-                    recipients.append(email)
+                if EMAIL_TARGETS.get(key):
+                    recipients.append(EMAIL_TARGETS[key])
 
-        if not recipients:
-            await call.answer("Не удалось определить получателей", show_alert=True)
-            return
+        subject = (
+            f"Авансовый отчёт | {employee.get('employee_short')} | "
+            f"{trip.get('date_from')}–{trip.get('date_to')} | "
+            f"{trip.get('object_name')}"
+        )
+
+        body = (
+            "Добрый день.\n\n"
+            f"Направляю авансовый отчёт по командировке\n"
+            f"{trip.get('object_name')}, {trip.get('city', '')}\n"
+            f"с {trip.get('date_from')} по {trip.get('date_to')}.\n\n"
+            "--\n"
+            f"С уважением,\n"
+            f"{employee.get('employee_name')}\n"
+            f"{employee.get('organization', 'АО «Интерматик»')}\n"
+            f"e-mail: {employee.get('email')}"
+        )
 
         send_email(
             to_emails=recipients,
-            subject="Авансовый отчёт",
-            body="Во вложении авансовый отчёт.",
+            subject=subject,
+            body=body,
             attachments=[data["advance_docx"]],
         )
 
         await call.message.answer(
             "✅ Авансовый отчёт отправлен\n\n"
-            "Кому:\n"
-            + "\n".join(f"• {email}" for email in recipients)
+            "Кому:\n" + "\n".join(f"• {r}" for r in recipients)
         )
 
-        # 🔹 чистим FSM
         await state.clear()
-
-        # 🔹 возврат в главное меню (КАК ВЕЗДЕ)
-        from keyboards.main import main_menu
         await call.message.answer(
             "Выберите действие:",
-            reply_markup=main_menu,
+            reply_markup=main_menu
         )
 
         await call.answer()
         return
 
-    # ================= TOGGLE =================
     if action in selected:
         selected.remove(action)
     else:
         selected.append(action)
 
     await state.update_data(email_targets=selected)
-
     await call.message.edit_reply_markup(
         reply_markup=email_targets_keyboard(selected)
     )
@@ -349,7 +332,6 @@ async def advance_email_select(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 
-#
 @router.callback_query(
     ExpenseStates.confirm,
     F.data == "advance_cancel"
