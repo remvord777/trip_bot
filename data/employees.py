@@ -1,6 +1,7 @@
 EMPLOYEES = {
     335400441: {  # Воробьев
         "employee_name": "Воробьев Денис Сергеевич",
+        "employee_short": "Воробьев Д.С.",
         "position": "Старший инженер",
         "email": "vorobev@intermatic.energy",
         "signature": (
@@ -15,6 +16,7 @@ EMPLOYEES = {
 
     1087265764: {  # Колтыга
         "employee_name": "Колтыга Константин Сергеевич",
+        "employee_short": "Колтыга К.С.",
         "position": "Ведущий инженер",
         "email": "koltyga@intermatic.energy",
         "signature": (
@@ -27,6 +29,7 @@ EMPLOYEES = {
     },
     7197179581: {  # ТЕСТОВЫЙ ПОЛЬЗОВАТЕЛЬ
         "employee_name": "Вальфрамов Моисей Иссаакович",
+        "employee_short": "Вальфрамов М.И.",
         "position": "Просто гений",
         "email": "rem-denv@yandex.ru",
         "signature": (

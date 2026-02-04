@@ -33,6 +33,7 @@ async def start_handler(message: Message, state: FSMContext):
     # сохраняем сотрудника в FSM (multi-user)
     await state.update_data(
         employee_name=employee["employee_name"],
+        employee_short=employee["employee_short"],
         position=employee["position"],
         email=employee["email"],
         signature=employee["signature"],

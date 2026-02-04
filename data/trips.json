@@ -22,6 +22,18 @@
       "files": [
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_13.02.2026–20.02.2026.docx"
       ]
+    },
+    {
+      "trip_id": 3,
+      "city": "Рефтинский",
+      "object_name": "Рефтинская ГРЭС",
+      "date_from": "04.02.2026",
+      "date_to": "12.02.2026",
+      "total": "9",
+      "files": [
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_04.02.2026–12.02.2026.docx",
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_04.02.2026–12.02.2026.docx"
+      ]
     }
   ]
 }

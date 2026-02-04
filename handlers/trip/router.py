@@ -62,6 +62,7 @@ async def trip_start(message: Message, state: FSMContext):
     # 🔥 ГАРАНТИЯ ДАННЫХ
     await state.update_data(
         employee_name=employee["employee_name"],
+        employee_short=employee["employee_short"],
         position=employee["position"],
         email=employee["email"],
         signature=employee["signature"],

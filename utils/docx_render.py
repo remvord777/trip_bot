@@ -45,6 +45,7 @@ def render_docx(template_name: str, data: dict) -> Path:
 
     replacements = {
         "{{employee_name}}": data.get("employee_name", ""),
+        "{{employee_short}}": data.get("employee_short", ""),
         "{{position}}": data.get("position", ""),
         "{{city}}": f"{data.get('settlement_prefix', '')} {data.get('city', '')}".strip(),
         "{{object}}": data.get("object_name", ""),
