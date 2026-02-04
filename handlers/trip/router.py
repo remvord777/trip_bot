@@ -308,11 +308,34 @@ async def email_select(call: CallbackQuery, state: FSMContext):
 
         trips[uid].append({
             "trip_id": len(trips[uid]) + 1,
+
+            # ===== сотрудник =====
+            "employee_name": data.get("employee_name"),
+            "employee_short": data.get("employee_short"),
+            "position": data.get("position"),
+            "email": data.get("email"),
+
+            # ===== подразделение / организация =====
+            "department": data.get("organization"),
+            "organization": data.get("organization"),
+
+            # ===== локация =====
             "city": data.get("city"),
+            "settlement_prefix": data.get("settlement_prefix"),
             "object_name": data.get("object_name"),
+
+            # ===== договор =====
+            "contract": data.get("contract"),
+
+            # ===== даты =====
             "date_from": data.get("date_from"),
             "date_to": data.get("date_to"),
             "total": data.get("total"),
+
+            # ===== назначение =====
+            "service": data.get("service"),
+
+            # ===== файлы =====
             "files": [str(p) for p in data.get("files", [])],
         })
 

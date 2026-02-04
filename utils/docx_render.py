@@ -40,21 +40,36 @@ def render_docx(template_name: str, data: dict) -> Path:
     doc = Document(template_path)
 
     replacements = {
+        # ===== СОТРУДНИК =====
         "{{employee_name}}": data.get("employee_name", ""),
         "{{employee_short}}": data.get("employee_short", ""),
         "{{position}}": data.get("position", ""),
+
+        # ===== ОРГАНИЗАЦИЯ / ПОДРАЗДЕЛЕНИЕ =====
         "{{department}}": data.get("department", ""),
 
+        # ===== ЛОКАЦИЯ =====
+        "{{city}}": f"{data.get('settlement_prefix', '')} {data.get('city', '')}".strip(),
+        "{{object}}": data.get("object_name", ""),
         "{{object_name}}": data.get("object_name", ""),
-        "{{contract}}": data.get("contract", ""),
-        "{{purpose}}": data.get("purpose", ""),
 
+
+        # ===== ДОГОВОР / ОРГАНИЗАЦИЯ =====
+        "{{contract}}": data.get("contract", ""),
+        "{{organization}}": data.get("organization", ""),
+
+        # ===== ДАТЫ =====
         "{{date_from}}": data.get("date_from", ""),
         "{{date_to}}": data.get("date_to", ""),
-        "{{total}}": str(data.get("total", "")),
-
-        "{{advance_amount}}": str(data.get("advance_amount", "")),
+        "{{apply_date}}": data.get("apply_date", ""),
         "{{report_date}}": data.get("report_date", ""),
+
+        # ===== АВАНС =====
+        "{{advance_amount}}": str(data.get("advance_amount", "")),
+
+        # ===== ПРОЧЕЕ =====
+        "{{purpose}}": data.get("service", ""),
+        "{{total}}": str(data.get("total", "")),
     }
 
     for paragraph in doc.paragraphs:
