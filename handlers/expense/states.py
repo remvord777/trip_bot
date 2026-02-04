@@ -13,3 +13,6 @@ class ExpenseStates(StatesGroup):
     input_ticket_amount = State()
 
     confirm = State()
+
+    # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
+    email_select = State()

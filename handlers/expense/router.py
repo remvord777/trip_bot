@@ -1,8 +1,8 @@
 # handlers/expense/router.py
-from keyboards.email_targets import email_targets_keyboard
 
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from aiogram import Router, F
 from aiogram.types import (
@@ -15,10 +15,14 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 
 from handlers.expense.states import ExpenseStates
+from keyboards.email_targets import email_targets_keyboard
+from data.email_targets import EMAIL_TARGETS
+
 from data.trips_store import load_trips
 from data.advances_store import add_advance
 from data.employees import EMPLOYEES
 from utils.docx_render import render_docx
+from utils.mailer import send_email
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -65,7 +69,7 @@ async def expense_entry(message: Message, state: FSMContext):
 
 
 # ======================================================
-# SELECT TRIP + PER DIEM
+# SELECT TRIP
 # ======================================================
 
 @router.callback_query(
@@ -88,7 +92,6 @@ async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
 
     await state.update_data(
         trip=trip,
-        trip_id=trip_id,
         days=days,
         per_diem_rate=PER_DIEM_RATE,
         per_diem_total=per_diem_total,
@@ -126,20 +129,13 @@ async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
 )
 async def accommodation_selected(call: CallbackQuery, state: FSMContext):
     acc_type = call.data.split(":")[1]
-    await state.update_data(accommodation_type=acc_type)
 
     if acc_type == "none":
         await state.update_data(accommodation_amount=0)
-        await call.message.answer(
-            "🚕 Введите сумму такси (₽).\n"
-            "Если такси не было — введите 0."
-        )
+        await call.message.answer("🚕 Введите сумму такси (₽):")
         await state.set_state(ExpenseStates.input_taxi_amount)
     else:
-        await call.message.answer(
-            "🏨 Введите сумму проживания (₽).\n"
-            "Одной суммой за весь период."
-        )
+        await call.message.answer("🏨 Введите сумму проживания (₽):")
         await state.set_state(ExpenseStates.input_accommodation_amount)
 
     await call.answer()
@@ -151,11 +147,7 @@ async def accommodation_selected(call: CallbackQuery, state: FSMContext):
 )
 async def accommodation_amount(message: Message, state: FSMContext):
     await state.update_data(accommodation_amount=int(message.text))
-
-    await message.answer(
-        "🚕 Введите сумму такси (₽).\n"
-        "Если такси не было — введите 0."
-    )
+    await message.answer("🚕 Введите сумму такси (₽):")
     await state.set_state(ExpenseStates.input_taxi_amount)
 
 
@@ -193,13 +185,12 @@ async def taxi_amount(message: Message, state: FSMContext):
 )
 async def ticket_type_selected(call: CallbackQuery, state: FSMContext):
     ticket_type = call.data.split(":")[1]
-    await state.update_data(ticket_type=ticket_type)
 
     if ticket_type == "none":
         await state.update_data(ticket_amount=0)
         await show_confirm(call, state)
     else:
-        await call.message.answer("Введите сумму билетов (₽).")
+        await call.message.answer("Введите сумму билетов (₽):")
         await state.set_state(ExpenseStates.input_ticket_amount)
 
     await call.answer()
@@ -228,13 +219,7 @@ async def show_confirm(target, state: FSMContext):
         + data.get("ticket_amount", 0)
     )
 
-    # 🔥 КЛЮЧЕВОЕ МЕСТО — ЗАКРЕПЛЯЕМ ВСЕ ЦИФРЫ В FSM
-    await state.update_data(
-        total_amount=total,
-        accommodation_amount=data.get("accommodation_amount", 0),
-        taxi_amount=data.get("taxi_amount", 0),
-        ticket_amount=data.get("ticket_amount", 0),
-    )
+    await state.update_data(total_amount=total)
 
     await target.answer(
         "📋 Авансовый расчёт\n\n"
@@ -256,7 +241,7 @@ async def show_confirm(target, state: FSMContext):
 
 
 # ======================================================
-# SAVE + GENERATE DOCX
+# SAVE + DOCX + EMAIL
 # ======================================================
 
 @router.callback_query(
@@ -271,59 +256,87 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
     employee = EMPLOYEES.get(telegram_id, {})
 
     docx_data = {
-        # ===== сотрудник =====
         "employee_name": employee.get("employee_name", ""),
         "employee_short": employee.get("employee_short", ""),
         "position": employee.get("position", ""),
         "department": trip.get("department", ""),
-
-        # ===== объект / договор =====
         "object_name": trip.get("object_name", ""),
         "contract": trip.get("contract", ""),
         "organization": trip.get("organization", ""),
         "purpose": trip.get("service", ""),
-
-        # ===== даты =====
         "date_from": trip.get("date_from", "")[:5],
         "date_to": trip.get("date_to", "")[:5],
         "report_date": datetime.now().strftime("%d.%m.%Y"),
-
-        # ===== расходы =====
         "accommodation_amount": str(data.get("accommodation_amount", 0)),
         "taxi_amount": str(data.get("taxi_amount", 0)),
         "ticket_amount": str(data.get("ticket_amount", 0)),
-        "per_diem_rate": str(data.get("per_diem_rate", 0)),
         "per_diem_total": str(data.get("per_diem_total", 0)),
         "total_amount": str(data.get("total_amount", 0)),
-
-        # ===== алиасы под шаблон =====
-        "acc_am": str(data.get("accommodation_amount", 0)),
-        "taxi_am": str(data.get("taxi_amount", 0)),
-        "ticket_amount": str(data.get("ticket_amount", 0)),
-
-        # ===== служебное =====
-        "total": str(data.get("days", "")),
-        "advance_amount": str(data.get("total_amount", "")),
     }
 
-    add_advance(str(telegram_id), docx_data)
-
-    docx_path = render_docx(
-        template_name="advance_report.docx",
-        data=docx_data
-    )
+    docx_path = Path(render_docx("advance_report.docx", docx_data))
+    await state.update_data(advance_docx=docx_path, email_targets=[])
 
     await call.message.answer_document(
         FSInputFile(docx_path),
         caption="📄 Авансовый отчёт сформирован"
     )
 
+    await state.set_state(ExpenseStates.email_select)
     await call.message.answer(
         "📤 Куда отправить авансовый отчёт?",
-        reply_markup=email_targets_keyboard([])  # ← ТОЧНО КАК РАНЬШЕ
+        reply_markup=email_targets_keyboard([])
     )
 
-    # ❗ ВАЖНО: state.clear() ЗДЕСЬ НЕ ДЕЛАЕМ
+    await call.answer()
+
+
+@router.callback_query(
+    ExpenseStates.email_select,
+    F.data.startswith("email:")
+)
+async def advance_email_select(call: CallbackQuery, state: FSMContext):
+    action = call.data.replace("email:", "")
+    data = await state.get_data()
+    selected = data.get("email_targets", [])
+
+    if action == "send":
+        if not selected:
+            await call.answer("Выберите получателя", show_alert=True)
+            return
+
+        recipients = []
+        employee = EMPLOYEES.get(call.from_user.id, {})
+
+        for key in selected:
+            if key == "me":
+                recipients.append(employee.get("email", ""))
+            else:
+                recipients.append(EMAIL_TARGETS.get(key, ""))
+
+        recipients = [r for r in recipients if r]
+
+        send_email(
+            to_emails=recipients,
+            subject="Авансовый отчёт",
+            body="Во вложении авансовый отчёт.",
+            attachments=[data["advance_docx"]],
+        )
+
+        await call.message.answer("✅ Авансовый отчёт отправлен")
+        await state.clear()
+        await call.answer()
+        return
+
+    if action in selected:
+        selected.remove(action)
+    else:
+        selected.append(action)
+
+    await state.update_data(email_targets=selected)
+    await call.message.edit_reply_markup(
+        reply_markup=email_targets_keyboard(selected)
+    )
     await call.answer()
 
 
