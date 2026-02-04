@@ -1,13 +1,6 @@
 # handlers/expense/router.py
 import logging
 from datetime import datetime
-from aiogram.types import FSInputFile
-from datetime import datetime
-from utils.location_resolver import resolve_contract_by_object
-
-from data.employees import EMPLOYEES
-from utils.docx_render import render_docx
-from data.advances_store import add_advance
 
 from aiogram import Router, F
 from aiogram.types import (
@@ -19,9 +12,10 @@ from aiogram.types import (
 )
 from aiogram.fsm.context import FSMContext
 
+from handlers.expense.states import ExpenseStates
 from data.trips_store import load_trips
 from data.advances_store import add_advance
-from handlers.expense.states import ExpenseStates
+from data.employees import EMPLOYEES
 from utils.docx_render import render_docx
 
 logger = logging.getLogger(__name__)
@@ -232,7 +226,13 @@ async def show_confirm(target, state: FSMContext):
         + data.get("ticket_amount", 0)
     )
 
-    await state.update_data(total_amount=total)
+    # 🔥 КЛЮЧЕВОЕ МЕСТО — ЗАКРЕПЛЯЕМ ВСЕ ЦИФРЫ В FSM
+    await state.update_data(
+        total_amount=total,
+        accommodation_amount=data.get("accommodation_amount", 0),
+        taxi_amount=data.get("taxi_amount", 0),
+        ticket_amount=data.get("ticket_amount", 0),
+    )
 
     await target.answer(
         "📋 Авансовый расчёт\n\n"
@@ -253,12 +253,10 @@ async def show_confirm(target, state: FSMContext):
     await state.set_state(ExpenseStates.confirm)
 
 
-from datetime import datetime
-
-
 # ======================================================
 # SAVE + GENERATE DOCX
 # ======================================================
+
 @router.callback_query(
     ExpenseStates.confirm,
     F.data == "advance_confirm"
@@ -270,28 +268,38 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
     trip = data["trip"]
     employee = EMPLOYEES.get(telegram_id, {})
 
-    contract = resolve_contract_by_object(trip.get("object_name", ""))
-
     docx_data = {
-        # сотрудник
+        # ===== сотрудник =====
         "employee_name": employee.get("employee_name", ""),
         "employee_short": employee.get("employee_short", ""),
         "position": employee.get("position", ""),
-        "department": employee.get("department", ""),
+        "department": trip.get("department", ""),
 
-        # командировка
+        # ===== объект / договор =====
         "object_name": trip.get("object_name", ""),
-        "contract": contract,          # ← ТОЛЬКО НОМЕР
+        "contract": trip.get("contract", ""),
+        "organization": trip.get("organization", ""),
         "purpose": trip.get("service", ""),
 
-        # даты без года
+        # ===== даты =====
         "date_from": trip.get("date_from", "")[:5],
         "date_to": trip.get("date_to", "")[:5],
-
-        # служебное
         "report_date": datetime.now().strftime("%d.%m.%Y"),
 
-        # суммы
+        # ===== расходы =====
+        "accommodation_amount": str(data.get("accommodation_amount", 0)),
+        "taxi_amount": str(data.get("taxi_amount", 0)),
+        "ticket_amount": str(data.get("ticket_amount", 0)),
+        "per_diem_rate": str(data.get("per_diem_rate", 0)),
+        "per_diem_total": str(data.get("per_diem_total", 0)),
+        "total_amount": str(data.get("total_amount", 0)),
+
+        # ===== алиасы под шаблон =====
+        "acc_am": str(data.get("accommodation_amount", 0)),
+        "taxi_am": str(data.get("taxi_amount", 0)),
+        "ticket_amount": str(data.get("ticket_amount", 0)),
+
+        # ===== служебное =====
         "total": str(data.get("days", "")),
         "advance_amount": str(data.get("total_amount", "")),
     }
@@ -310,6 +318,7 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
 
     await state.clear()
     await call.answer()
+
 
 @router.callback_query(
     ExpenseStates.confirm,

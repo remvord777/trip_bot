@@ -316,7 +316,7 @@ async def email_select(call: CallbackQuery, state: FSMContext):
             "email": data.get("email"),
 
             # ===== подразделение / организация =====
-            "department": data.get("organization"),
+            "department": data.get("department", data.get("organization")),
             "organization": data.get("organization"),
 
             # ===== локация =====
@@ -334,6 +334,17 @@ async def email_select(call: CallbackQuery, state: FSMContext):
 
             # ===== назначение =====
             "service": data.get("service"),
+
+            # ===== аванс / отчет =====
+            "advance_amount": data.get("advance_amount", ""),
+            "report_date": data.get(
+                "report_date",
+                datetime.now().strftime("%d.%m.%Y"),
+            ),
+            "apply_date": data.get(
+                "apply_date",
+                datetime.now().strftime("%d.%m.%Y"),
+            ),
 
             # ===== файлы =====
             "files": [str(p) for p in data.get("files", [])],
