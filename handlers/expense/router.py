@@ -285,6 +285,7 @@ async def advance_email_select(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     selected = data.get("email_targets", [])
 
+    # ================= SEND =================
     if action == "send":
         if not selected:
             await call.answer("Выберите получателя", show_alert=True)
@@ -295,11 +296,17 @@ async def advance_email_select(call: CallbackQuery, state: FSMContext):
 
         for key in selected:
             if key == "me":
-                recipients.append(employee.get("email", ""))
+                email = employee.get("email")
+                if email:
+                    recipients.append(email)
             else:
-                recipients.append(EMAIL_TARGETS.get(key, ""))
+                email = EMAIL_TARGETS.get(key)
+                if email:
+                    recipients.append(email)
 
-        recipients = [r for r in recipients if r]
+        if not recipients:
+            await call.answer("Не удалось определить получателей", show_alert=True)
+            return
 
         send_email(
             to_emails=recipients,
@@ -308,23 +315,41 @@ async def advance_email_select(call: CallbackQuery, state: FSMContext):
             attachments=[data["advance_docx"]],
         )
 
-        await call.message.answer("✅ Авансовый отчёт отправлен")
+        await call.message.answer(
+            "✅ Авансовый отчёт отправлен\n\n"
+            "Кому:\n"
+            + "\n".join(f"• {email}" for email in recipients)
+        )
+
+        # 🔹 чистим FSM
         await state.clear()
+
+        # 🔹 возврат в главное меню (КАК ВЕЗДЕ)
+        from keyboards.main import main_menu
+        await call.message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu,
+        )
+
         await call.answer()
         return
 
+    # ================= TOGGLE =================
     if action in selected:
         selected.remove(action)
     else:
         selected.append(action)
 
     await state.update_data(email_targets=selected)
+
     await call.message.edit_reply_markup(
         reply_markup=email_targets_keyboard(selected)
     )
+
     await call.answer()
 
 
+#
 @router.callback_query(
     ExpenseStates.confirm,
     F.data == "advance_cancel"
