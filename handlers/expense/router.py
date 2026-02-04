@@ -1,5 +1,6 @@
-from data.trips_store import load_trips
+# handlers/expense/router.py
 import logging
+from datetime import datetime
 
 from aiogram import Router, F
 from aiogram.types import (
@@ -7,29 +8,36 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    FSInputFile,
 )
 from aiogram.fsm.context import FSMContext
 
 from data.trips_store import load_trips
+from data.advances_store import add_advance
 from handlers.expense.states import ExpenseStates
+from utils.docx_render import render_docx
 
 logger = logging.getLogger(__name__)
 router = Router()
 
+PER_DIEM_RATE = 1200
+
+
+# ======================================================
+# ENTRY
+# ======================================================
+
 @router.message(F.text == "💰 Авансовый отчёт")
 async def expense_entry(message: Message, state: FSMContext):
-    logger.info("EXPENSE ENTRY | telegram_id=%s", message.from_user.id)
-
     await state.clear()
 
     telegram_id = str(message.from_user.id)
-    all_trips = load_trips()
-    trips = all_trips.get(telegram_id, [])
+    trips = load_trips().get(telegram_id, [])
 
     if not trips:
         await message.answer(
             "❗ У вас пока нет оформленных командировок.\n\n"
-            "Сначала оформите командировку через пункт «🧳 Командировка»."
+            "Сначала оформите командировку через «🧳 Командировка»."
         )
         return
 
@@ -54,7 +62,7 @@ async def expense_entry(message: Message, state: FSMContext):
 
 
 # ======================================================
-# SELECT TRIP
+# SELECT TRIP + PER DIEM
 # ======================================================
 
 @router.callback_query(
@@ -62,92 +70,250 @@ async def expense_entry(message: Message, state: FSMContext):
     F.data.startswith("expense_trip:")
 )
 async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
-    trip_id = int(call.data.replace("expense_trip:", ""))
+    trip_id = int(call.data.split(":")[1])
     telegram_id = str(call.from_user.id)
 
-    all_trips = load_trips()
-    trips = all_trips.get(telegram_id, [])
+    trips = load_trips().get(telegram_id, [])
     trip = next((t for t in trips if t["trip_id"] == trip_id), None)
 
     if not trip:
         await call.answer("Командировка не найдена", show_alert=True)
         return
 
+    days = int(trip["total"])
+    per_diem_total = days * PER_DIEM_RATE
+
     await state.update_data(
-        trip_id=trip_id,
         trip=trip,
-        expense_files=[],
+        trip_id=trip_id,
+        days=days,
+        per_diem_rate=PER_DIEM_RATE,
+        per_diem_total=per_diem_total,
     )
 
     await call.message.answer(
-        "📊 Авансовый отчёт\n\n"
-        "Выбрана командировка:\n"
+        "📊 Авансовый расчёт\n\n"
         f"📍 {trip['object_name']}\n"
         f"📅 {trip['date_from']} – {trip['date_to']}\n"
-        f"🧮 {trip.get('total', '—')} дней\n\n"
-        "📎 Пришлите чеки, фото или скриншоты.\n"
-        "Можно отправлять несколько сообщений.\n\n"
-        "Когда закончите — напишите «Готово»."
+        f"🧮 Дней: {days}\n\n"
+        f"💰 Суточные: {days} × {PER_DIEM_RATE} ₽ = "
+        f"<b>{per_diem_total:,} ₽</b>\n\n"
+        "🏨 Выберите тип проживания:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🏨 Гостиница", callback_data="acc:hotel")],
+                [InlineKeyboardButton(text="🏠 Апартаменты", callback_data="acc:apart")],
+                [InlineKeyboardButton(text="🚫 Не требуется", callback_data="acc:none")],
+            ]
+        ),
+        parse_mode="HTML"
     )
 
-    await state.set_state(ExpenseStates.upload_files)
+    await state.set_state(ExpenseStates.select_accommodation)
     await call.answer()
 
 
 # ======================================================
-# UPLOAD FILES
+# ACCOMMODATION
+# ======================================================
+
+@router.callback_query(
+    ExpenseStates.select_accommodation,
+    F.data.startswith("acc:")
+)
+async def accommodation_selected(call: CallbackQuery, state: FSMContext):
+    acc_type = call.data.split(":")[1]
+    await state.update_data(accommodation_type=acc_type)
+
+    if acc_type == "none":
+        await state.update_data(accommodation_amount=0)
+        await call.message.answer(
+            "🚕 Введите сумму такси (₽).\n"
+            "Если такси не было — введите 0."
+        )
+        await state.set_state(ExpenseStates.input_taxi_amount)
+    else:
+        await call.message.answer(
+            "🏨 Введите сумму проживания (₽).\n"
+            "Одной суммой за весь период."
+        )
+        await state.set_state(ExpenseStates.input_accommodation_amount)
+
+    await call.answer()
+
+
+@router.message(
+    ExpenseStates.input_accommodation_amount,
+    F.text.regexp(r"^\d+$")
+)
+async def accommodation_amount(message: Message, state: FSMContext):
+    await state.update_data(accommodation_amount=int(message.text))
+
+    await message.answer(
+        "🚕 Введите сумму такси (₽).\n"
+        "Если такси не было — введите 0."
+    )
+    await state.set_state(ExpenseStates.input_taxi_amount)
+
+
+# ======================================================
+# TAXI
 # ======================================================
 
 @router.message(
-    ExpenseStates.upload_files,
-    F.photo | F.document
+    ExpenseStates.input_taxi_amount,
+    F.text.regexp(r"^\d+$")
 )
-async def expense_files_upload(message: Message, state: FSMContext):
-    data = await state.get_data()
-    files = data.get("expense_files", [])
-
-    if message.photo:
-        files.append({
-            "type": "photo",
-            "file_id": message.photo[-1].file_id,
-        })
-
-    if message.document:
-        files.append({
-            "type": "document",
-            "file_id": message.document.file_id,
-            "name": message.document.file_name,
-        })
-
-    await state.update_data(expense_files=files)
+async def taxi_amount(message: Message, state: FSMContext):
+    await state.update_data(taxi_amount=int(message.text))
 
     await message.answer(
-        f"📎 Файл принят (всего файлов: {len(files)})\n"
-        "Можете отправить ещё или написать «Готово»."
+        "✈️🚆 Выберите тип билетов:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="✈️ Авиа", callback_data="ticket:avia")],
+                [InlineKeyboardButton(text="🚆 ЖД", callback_data="ticket:rail")],
+                [InlineKeyboardButton(text="🚫 Не требуется", callback_data="ticket:none")],
+            ]
+        )
+    )
+    await state.set_state(ExpenseStates.select_ticket_type)
+
+
+# ======================================================
+# TICKETS
+# ======================================================
+
+@router.callback_query(
+    ExpenseStates.select_ticket_type,
+    F.data.startswith("ticket:")
+)
+async def ticket_type_selected(call: CallbackQuery, state: FSMContext):
+    ticket_type = call.data.split(":")[1]
+    await state.update_data(ticket_type=ticket_type)
+
+    if ticket_type == "none":
+        await state.update_data(ticket_amount=0)
+        await show_confirm(call, state)
+    else:
+        await call.message.answer("Введите сумму билетов (₽).")
+        await state.set_state(ExpenseStates.input_ticket_amount)
+
+    await call.answer()
+
+
+@router.message(
+    ExpenseStates.input_ticket_amount,
+    F.text.regexp(r"^\d+$")
+)
+async def ticket_amount(message: Message, state: FSMContext):
+    await state.update_data(ticket_amount=int(message.text))
+    await show_confirm(message, state)
+
+
+# ======================================================
+# CONFIRM
+# ======================================================
+
+async def show_confirm(target, state: FSMContext):
+    data = await state.get_data()
+
+    total = (
+        data["per_diem_total"]
+        + data.get("accommodation_amount", 0)
+        + data.get("taxi_amount", 0)
+        + data.get("ticket_amount", 0)
     )
 
+    await state.update_data(total_amount=total)
+
+    await target.answer(
+        "📋 Авансовый расчёт\n\n"
+        f"💰 Суточные: {data['per_diem_total']:,} ₽\n"
+        f"🏨 Проживание: {data.get('accommodation_amount', 0):,} ₽\n"
+        f"🚕 Такси: {data.get('taxi_amount', 0):,} ₽\n"
+        f"✈️🚆 Билеты: {data.get('ticket_amount', 0):,} ₽\n\n"
+        f"<b>💵 ИТОГО: {total:,} ₽</b>",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="✅ Подтвердить", callback_data="advance_confirm")],
+                [InlineKeyboardButton(text="❌ Отменить", callback_data="advance_cancel")],
+            ]
+        ),
+        parse_mode="HTML"
+    )
+
+    await state.set_state(ExpenseStates.confirm)
+
+
+from datetime import datetime
+
 
 # ======================================================
-# FINISH
+# SAVE + GENERATE DOCX
 # ======================================================
 
-@router.message(
-    ExpenseStates.upload_files,
-    F.text.lower() == "готово"
+@router.callback_query(
+    ExpenseStates.confirm,
+    F.data == "advance_confirm"
 )
-async def expense_done(message: Message, state: FSMContext):
+async def advance_confirm(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
+    telegram_id = str(call.from_user.id)
 
-    trip = data.get("trip")
-    files = data.get("expense_files", [])
+    trip = data["trip"]
 
-    await message.answer(
-        "✅ Файлы приняты.\n\n"
-        "Командировка:\n"
-        f"📍 {trip['object_name']}\n"
-        f"📅 {trip['date_from']} – {trip['date_to']}\n"
-        f"📎 Файлов: {len(files)}\n\n"
-        "Формирование авансового отчёта будет добавлено следующим шагом."
+    advance = {
+        # ===== ШАПКА =====
+        "report_date": datetime.now().strftime("%d.%m.%Y"),
+
+        "department": trip.get("department", "—"),
+        "employee_name": trip.get("employee_name", "—"),
+        "position": trip.get("position", "—"),
+        "purpose": trip.get("service", "Командировка"),
+        "contract": trip.get("contract", "—"),
+
+        # ===== КОМАНДИРОВКА =====
+        "object_name": trip["object_name"],
+        "date_from": trip["date_from"],
+        "date_to": trip["date_to"],
+        "total": data["days"],
+
+        # ===== ФИНАНСЫ =====
+        "per_diem_rate": data["per_diem_rate"],
+        "per_diem_total": data["per_diem_total"],
+
+        "accommodation_amount": data.get("accommodation_amount", 0),
+        "taxi_amount": data.get("taxi_amount", 0),
+        "ticket_amount": data.get("ticket_amount", 0),
+
+        "total_amount": data["total_amount"],
+    }
+
+    # сохраняем
+    add_advance(telegram_id, advance)
+
+    # генерируем DOCX
+    docx_path = render_docx(
+        template_name="advance_report.docx",
+        data=advance
+    )
+
+    await call.message.answer_document(
+        FSInputFile(docx_path),
+        caption="📄 Авансовый отчёт сформирован"
     )
 
     await state.clear()
+    await call.answer()
+
+
+
+@router.callback_query(
+    ExpenseStates.confirm,
+    F.data == "advance_cancel"
+)
+async def advance_cancel(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await call.message.answer("❌ Аванс отменён.")
+    await call.answer()

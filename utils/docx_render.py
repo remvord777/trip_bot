@@ -13,11 +13,12 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 FILE_TITLES = {
     "service_task.docx": "служебное_задание",
     "money_avans.docx": "заявление_командировка",
+    "advance_report.docx": "авансовый_отчет",   # ← НОВОЕ
 }
 
 
 def _replace_in_paragraph(paragraph, replacements: dict):
-    full_text = paragraph.text
+    full_text = "".join(run.text for run in paragraph.runs)
     replaced = False
 
     for key, value in replacements.items():
@@ -28,15 +29,13 @@ def _replace_in_paragraph(paragraph, replacements: dict):
     if not replaced:
         return
 
-    # сохраняем стиль первого run
-    first_run = paragraph.runs[0]
-
-    # очищаем все runs
+    # очищаем runs
     for run in paragraph.runs:
         run.text = ""
 
-    # записываем текст в первый run
-    first_run.text = full_text
+    # записываем в первый run
+    paragraph.runs[0].text = full_text
+
 
 
 def render_docx(template_name: str, data: dict) -> Path:
@@ -56,7 +55,26 @@ def render_docx(template_name: str, data: dict) -> Path:
         "{{purpose}}": data.get("service", ""),
         "{{advance_amount}}": str(data.get("advance_amount", "")),
         "{{apply_date}}": datetime.now().strftime("%d.%m.%Y"),
+
+
+        # --- НОВОЕ ДЛЯ АВАНСОВОГО ---
+        "{{report_date}}": datetime.now().strftime("%d.%m.%Y"),
+        "{{department}}": data.get("department", ""),
+        "{{object_name}}": data.get("object_name", ""),
+
+        "{{per_diem_text}}": (
+            f"Суточные {data.get('per_diem_rate', 0)} × {data.get('total', 0)} дней"
+        ),
+        "{{per_diem_total}}": f"{data.get('per_diem_total', 0):,}".replace(",", " "),
+
+        "{{accommodation_amount}}": f"{data.get('accommodation_amount', 0):,}".replace(",", " "),
+        "{{taxi_amount}}": f"{data.get('taxi_amount', 0):,}".replace(",", " "),
+        "{{ticket_amount}}": f"{data.get('ticket_amount', 0):,}".replace(",", " "),
+
+        "{{total_amount}}": f"{data.get('total_amount', 0):,}".replace(",", " "),
     }
+
+
 
     # ===== ПАРАГРАФЫ =====
     for paragraph in doc.paragraphs:
@@ -71,7 +89,10 @@ def render_docx(template_name: str, data: dict) -> Path:
 
     # ===== ИМЯ ФАЙЛА =====
     doc_type = FILE_TITLES.get(template_name, "документ")
-    surname = data.get("employee_name", "").split()[0]
+
+    employee_name = data.get("employee_name", "").strip()
+    surname = employee_name.split()[0] if employee_name else "БезФИО"
+
     date_from = data.get("date_from", "")
     date_to = data.get("date_to", "")
 
@@ -81,3 +102,4 @@ def render_docx(template_name: str, data: dict) -> Path:
     doc.save(output_path)
 
     return output_path
+
