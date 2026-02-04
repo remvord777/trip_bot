@@ -209,6 +209,20 @@
       "report_date": "04.02.2026",
       "total": "8",
       "advance_amount": "20223"
+    },
+    {
+      "employee_name": "Воробьев Денис Сергеевич",
+      "employee_short": "Воробьев Д.С.",
+      "position": "Старший инженер",
+      "department": "",
+      "object_name": "Няганская ГРЭС",
+      "contract": "",
+      "purpose": "",
+      "date_from": "14.02",
+      "date_to": "20.02",
+      "report_date": "04.02.2026",
+      "total": "7",
+      "advance_amount": "62001"
     }
   ]
 }
