@@ -34,6 +34,18 @@
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_04.02.2026–12.02.2026.docx",
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_04.02.2026–12.02.2026.docx"
       ]
+    },
+    {
+      "trip_id": 4,
+      "city": "Нягань",
+      "object_name": "Няганская ГРЭС",
+      "date_from": "06.02.2026",
+      "date_to": "20.02.2026",
+      "total": "15",
+      "files": [
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_06.02.2026–20.02.2026.docx",
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_06.02.2026–20.02.2026.docx"
+      ]
     }
   ]
 }

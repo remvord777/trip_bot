@@ -1,6 +1,13 @@
 # handlers/expense/router.py
 import logging
 from datetime import datetime
+from aiogram.types import FSInputFile
+from datetime import datetime
+from utils.location_resolver import resolve_contract_by_object
+
+from data.employees import EMPLOYEES
+from utils.docx_render import render_docx
+from data.advances_store import add_advance
 
 from aiogram import Router, F
 from aiogram.types import (
@@ -252,51 +259,48 @@ from datetime import datetime
 # ======================================================
 # SAVE + GENERATE DOCX
 # ======================================================
-
 @router.callback_query(
     ExpenseStates.confirm,
     F.data == "advance_confirm"
 )
 async def advance_confirm(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    telegram_id = str(call.from_user.id)
+    telegram_id = call.from_user.id
 
     trip = data["trip"]
+    employee = EMPLOYEES.get(telegram_id, {})
 
-    advance = {
-        # ===== ШАПКА =====
+    contract = resolve_contract_by_object(trip.get("object_name", ""))
+
+    docx_data = {
+        # сотрудник
+        "employee_name": employee.get("employee_name", ""),
+        "employee_short": employee.get("employee_short", ""),
+        "position": employee.get("position", ""),
+        "department": employee.get("department", ""),
+
+        # командировка
+        "object_name": trip.get("object_name", ""),
+        "contract": contract,          # ← ТОЛЬКО НОМЕР
+        "purpose": trip.get("service", ""),
+
+        # даты без года
+        "date_from": trip.get("date_from", "")[:5],
+        "date_to": trip.get("date_to", "")[:5],
+
+        # служебное
         "report_date": datetime.now().strftime("%d.%m.%Y"),
 
-        "department": trip.get("department", "—"),
-        "employee_name": trip.get("employee_name", "—"),
-        "position": trip.get("position", "—"),
-        "purpose": trip.get("service", "Командировка"),
-        "contract": trip.get("contract", "—"),
-
-        # ===== КОМАНДИРОВКА =====
-        "object_name": trip["object_name"],
-        "date_from": trip["date_from"],
-        "date_to": trip["date_to"],
-        "total": data["days"],
-
-        # ===== ФИНАНСЫ =====
-        "per_diem_rate": data["per_diem_rate"],
-        "per_diem_total": data["per_diem_total"],
-
-        "accommodation_amount": data.get("accommodation_amount", 0),
-        "taxi_amount": data.get("taxi_amount", 0),
-        "ticket_amount": data.get("ticket_amount", 0),
-
-        "total_amount": data["total_amount"],
+        # суммы
+        "total": str(data.get("days", "")),
+        "advance_amount": str(data.get("total_amount", "")),
     }
 
-    # сохраняем
-    add_advance(telegram_id, advance)
+    add_advance(str(telegram_id), docx_data)
 
-    # генерируем DOCX
     docx_path = render_docx(
         template_name="advance_report.docx",
-        data=advance
+        data=docx_data
     )
 
     await call.message.answer_document(
@@ -306,8 +310,6 @@ async def advance_confirm(call: CallbackQuery, state: FSMContext):
 
     await state.clear()
     await call.answer()
-
-
 
 @router.callback_query(
     ExpenseStates.confirm,
