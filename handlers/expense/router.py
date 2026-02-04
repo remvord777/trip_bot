@@ -104,18 +104,12 @@ async def expense_trip_selected(call: CallbackQuery, state: FSMContext):
         f"🧮 Дней: {days}\n\n"
         f"💰 Суточные: {days} × {PER_DIEM_RATE} ₽ = "
         f"<b>{per_diem_total:,} ₽</b>\n\n"
-        "🏨 Выберите тип проживания:",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="🏨 Гостиница", callback_data="acc:hotel")],
-                [InlineKeyboardButton(text="🏠 Апартаменты", callback_data="acc:apart")],
-                [InlineKeyboardButton(text="🚫 Не требуется", callback_data="acc:none")],
-            ]
-        ),
+        "🏨 Введите сумму проживания (₽).\n"
+        "Если проживания не было — введите 0.",
         parse_mode="HTML"
     )
 
-    await state.set_state(ExpenseStates.select_accommodation)
+    await state.set_state(ExpenseStates.input_accommodation_amount)
     await call.answer()
 
 
@@ -154,7 +148,6 @@ async def accommodation_amount(message: Message, state: FSMContext):
 # ======================================================
 # TAXI
 # ======================================================
-
 @router.message(
     ExpenseStates.input_taxi_amount,
     F.text.regexp(r"^\d+$")
@@ -163,18 +156,10 @@ async def taxi_amount(message: Message, state: FSMContext):
     await state.update_data(taxi_amount=int(message.text))
 
     await message.answer(
-        "✈️🚆 Выберите тип билетов:",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="✈️ Авиа", callback_data="ticket:avia")],
-                [InlineKeyboardButton(text="🚆 ЖД", callback_data="ticket:rail")],
-                [InlineKeyboardButton(text="🚫 Не требуется", callback_data="ticket:none")],
-            ]
-        )
+        "✈️🚆 Введите сумму билетов (₽).\n"
+        "Если билетов не было — введите 0."
     )
-    await state.set_state(ExpenseStates.select_ticket_type)
-
-
+    await state.set_state(ExpenseStates.input_ticket_amount)
 # ======================================================
 # TICKETS
 # ======================================================
