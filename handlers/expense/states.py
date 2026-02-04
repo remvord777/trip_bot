@@ -16,3 +16,4 @@ class ExpenseStates(StatesGroup):
 
     # 🔥 ВОТ ЭТОГО НЕ ХВАТАЛО
     email_select = State()
+    attach_files = State()  # ← НОВОЕ
