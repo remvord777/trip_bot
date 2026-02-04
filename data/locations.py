@@ -15,7 +15,7 @@ LOCATIONS = {
             "ТЭЦ": {
                 "name": "Вологодская ТЭЦ",
                 "organization": "ПАО «ТГК-2»",
-                "contract": "365",
+                "contract": "ИМ-365",
             }
         }
     },
@@ -24,7 +24,7 @@ LOCATIONS = {
         "objects": {
             "Юго-Западная ТЭЦ": {
                 "organization": "ПАО «ТГК-2»",
-                "contract": "354",
+                "contract": "ИМ-354",
             }
         }
     },
@@ -35,7 +35,7 @@ LOCATIONS = {
             "Няганская ГРЭС": {
                 "organization": "ПАО «Форвард Энерго»",
                 "branch": "Энергосистема «Западная Сибирь»",
-                "contract": "293",
+                "contract": "ИМ-293",
             }
         }
     },
@@ -45,7 +45,7 @@ LOCATIONS = {
         "objects": {
             "Адлерская ТЭС": {
                 "organization": "ПАО «ОГК-2»",
-                "contract": "284",
+                "contract": "ИМ-284",
             }
         }
     },
@@ -54,7 +54,7 @@ LOCATIONS = {
         "objects": {
             "Хуадянь-Тенинская ТЭЦ": {
                 "organization": "Хуадянь-Тенинская ТЭЦ",
-                "contract": "370",
+                "contract": "ИМ-370",
             }
         }
     },
@@ -63,7 +63,7 @@ LOCATIONS = {
         "objects": {
             "Туапсинский НПЗ": {
                 "organization": "Туапсинский НПЗ",
-                "contract": "341",
+                "contract": "ИМ-341",
             }
         }
     },
@@ -72,7 +72,7 @@ LOCATIONS = {
         "objects": {
             "Киришская ГРЭС": {
                 "organization": "Киришская ГРЭС",
-                "contract": "335",
+                "contract": "ИМ-335",
             }
         }
     },
@@ -81,7 +81,7 @@ LOCATIONS = {
         "objects": {
             "Минская ТЭЦ-3": {
                 "organization": "Минская ТЭЦ-3",
-                "contract": "398",
+                "contract": "ИМ-398",
             }
         }
     },
@@ -90,7 +90,7 @@ LOCATIONS = {
         "objects": {
             "НЛМК": {
                 "organization": "НЛМК",
-                "contract": "376",
+                "contract": "ИМ-376",
             }
         }
     },

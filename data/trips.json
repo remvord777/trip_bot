@@ -156,5 +156,31 @@
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_04.02.2026–18.02.2026.docx"
       ]
     }
+  ],
+  "7197179581": [
+    {
+      "trip_id": 1,
+      "employee_name": "Вальфрамов Моисей Иссаакович",
+      "employee_short": "Вальфрамов М.И.",
+      "position": "Просто гений",
+      "email": "rem-denv@yandex.ru",
+      "department": "НЛМК",
+      "organization": "НЛМК",
+      "city": "Липецк",
+      "settlement_prefix": "г.",
+      "object_name": "НЛМК",
+      "contract": "376",
+      "date_from": "07.02.2026",
+      "date_to": "14.02.2026",
+      "total": "8",
+      "service": "Пусконаладочные работы",
+      "advance_amount": "10",
+      "report_date": "04.02.2026",
+      "apply_date": "04.02.2026",
+      "files": [
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Вальфрамов_07.02.2026–14.02.2026.docx",
+        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Вальфрамов_07.02.2026–14.02.2026.docx"
+      ]
+    }
   ]
 }
