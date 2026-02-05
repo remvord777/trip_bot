@@ -1,10 +1,14 @@
-# Python cache
+# env
+.env
+.env.*
+
+# runtime data
+data/*.json
+
+# generated files
+generated/
+
+# python
 __pycache__/
 *.pyc
-
-# Virtual environments
 .venv/
-
-# Runtime data
-data/
-generated/
