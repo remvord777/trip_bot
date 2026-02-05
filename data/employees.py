@@ -24,6 +24,7 @@ EMPLOYEES = {
             "С уважением,\n"
             "Колтыга Константин Сергеевич\n"
             "АО «Интерматик»\n"
+            "моб.:..."
             "e-mail: koltyga@intermatic.energy"
         ),
     },
@@ -35,6 +36,21 @@ EMPLOYEES = {
         "signature": (
             "--\n"
             "здраствуйте - я ваша тетя"
+        ),
+    },
+
+    1111111111: {  # Васьков
+        "employee_name": "Васьков Александр Михайлович",
+        "employee_short": "Васьков А.М.",
+        "position": "Старший инженер",
+        "email": "vaskov@intermatic.energy",
+        "signature": (
+            "--\n"
+            "С уважением,\n"
+            "Васьков Александр Михайлович\n"
+            "АО «Интерматик»\n"
+            "моб.:..."
+            "e-mail: vaskov@intermatic.energy"
         ),
     },
 }
