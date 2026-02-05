@@ -83,104 +83,26 @@
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_12.02.2026–26.02.2026.docx",
         "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_12.02.2026–26.02.2026.docx"
       ]
-    },
-    {
-      "trip_id": 5,
-      "employee_name": "Воробьев Денис Сергеевич",
-      "employee_short": "Воробьев Д.С.",
-      "position": "Старший инженер",
-      "email": "vorobev@intermatic.energy",
-      "department": "ПАО «ОГК-2»",
-      "organization": "ПАО «ОГК-2»",
-      "city": "Сочи",
-      "settlement_prefix": "г.",
-      "object_name": "Адлерская ТЭС",
-      "contract": "284",
-      "date_from": "01.02.2026",
-      "date_to": "28.02.2026",
-      "total": "28",
-      "service": "Сервисное обслуживание ПТК АСУТП",
-      "advance_amount": "12000",
-      "report_date": "04.02.2026",
-      "apply_date": "04.02.2026",
-      "files": [
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_01.02.2026–28.02.2026.docx",
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_01.02.2026–28.02.2026.docx"
-      ]
-    },
-    {
-      "trip_id": 6,
-      "employee_name": "Воробьев Денис Сергеевич",
-      "employee_short": "Воробьев Д.С.",
-      "position": "Старший инженер",
-      "email": "vorobev@intermatic.energy",
-      "department": "ПАО «ОГК-2»",
-      "organization": "ПАО «ОГК-2»",
-      "city": "Сочи",
-      "settlement_prefix": "г.",
-      "object_name": "Адлерская ТЭС",
-      "contract": "284",
-      "date_from": "07.02.2026",
-      "date_to": "19.02.2026",
-      "total": "13",
-      "service": "Пусконаладочные работы",
-      "advance_amount": "126",
-      "report_date": "04.02.2026",
-      "apply_date": "04.02.2026",
-      "files": [
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_07.02.2026–19.02.2026.docx",
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_07.02.2026–19.02.2026.docx"
-      ]
-    },
-    {
-      "trip_id": 7,
-      "employee_name": "Воробьев Денис Сергеевич",
-      "employee_short": "Воробьев Д.С.",
-      "position": "Старший инженер",
-      "email": "vorobev@intermatic.energy",
-      "department": "АО «КУЗБАССЭНЕРГО»",
-      "organization": "АО «КУЗБАССЭНЕРГО»",
-      "city": "Рефтинский",
-      "settlement_prefix": "п.",
-      "object_name": "Рефтинская ГРЭС",
-      "contract": "ИМ-346",
-      "date_from": "04.02.2026",
-      "date_to": "18.02.2026",
-      "total": "15",
-      "service": "Пусконаладочные работы",
-      "advance_amount": "8",
-      "report_date": "04.02.2026",
-      "apply_date": "04.02.2026",
-      "files": [
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Воробьев_04.02.2026–18.02.2026.docx",
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Воробьев_04.02.2026–18.02.2026.docx"
-      ]
-    }
-  ],
-  "7197179581": [
-    {
-      "trip_id": 1,
-      "employee_name": "Вальфрамов Моисей Иссаакович",
-      "employee_short": "Вальфрамов М.И.",
-      "position": "Просто гений",
-      "email": "rem-denv@yandex.ru",
-      "department": "НЛМК",
-      "organization": "НЛМК",
-      "city": "Липецк",
-      "settlement_prefix": "г.",
-      "object_name": "НЛМК",
-      "contract": "376",
-      "date_from": "07.02.2026",
-      "date_to": "14.02.2026",
-      "total": "8",
-      "service": "Пусконаладочные работы",
-      "advance_amount": "10",
-      "report_date": "04.02.2026",
-      "apply_date": "04.02.2026",
-      "files": [
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_служебное_задание_Вальфрамов_07.02.2026–14.02.2026.docx",
-        "C:\\Users\\vorobev\\PycharmProjects\\trip_bot\\generated\\ИМ_заявление_командировка_Вальфрамов_07.02.2026–14.02.2026.docx"
-      ]
     }
   ]
 }
+
+
+Посмотреть, кто заходил РАНЬШЕ
+journalctl -u trip_bot_v2
+
+
+Или за сегодня:
+
+journalctl -u trip_bot_v2 --since today
+
+
+Или за конкретный период:
+
+journalctl -u trip_bot_v2 --since "2026-02-04 18:00" --until "2026-02-04 21:00"
+
+
+👉 Ты увидишь:
+
+START | telegram_id=335400441
+Update id=...
