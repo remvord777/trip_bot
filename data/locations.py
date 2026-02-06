@@ -103,4 +103,13 @@ LOCATIONS = {
             }
         }
     },
+    "Верхотинское": {
+        "settlement_prefix": "г.",
+        "objects": {
+            "ГОК": {
+                "organization": "ГОК",
+                "contract": "ИМ-278",
+            }
+        }
+    },
 }
