@@ -53,4 +53,18 @@ EMPLOYEES = {
             "e-mail: vaskov@intermatic.energy"
         ),
     },
+    535248014: {  # Резиньков
+        "employee_name": "Резиньков Игорь Александрович",
+        "employee_short": "Резиньков И.А.",
+        "position": "Инженер",
+        "email": "rezinkov@intermatic.energy",
+        "signature": (
+            "--\n"
+            "С уважением,\n"
+            "Резиньков Игорь Александрович\n"
+            "АО «Интерматик»\n"
+            "моб.:..."
+            "e-mail: rezinkov@intermatic.energy"
+        ),
+    },
 }
